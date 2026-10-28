@@ -3,15 +3,29 @@ import { useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { FeedPostCard } from "../components/FeedPostCard";
 import { Icon } from "../components/Icon";
-import { AppScreen, Avatar, Card, ChoiceChip, IconButton, rowStyles, SectionHeading } from "../components/ui";
+import { AppButton, AppScreen, Avatar, Card, ChoiceChip, IconButton, rowStyles, SectionHeading } from "../components/ui";
 import { samplePosts } from "../data/mockData";
+import { testSupabaseConnection, type SupabaseConnectionTestResult } from "../lib/test-supabase";
 import { useAppColors } from "../theme/colors";
 
 export default function HomeScreen() {
   const colors = useAppColors();
   const [feedFilter, setFeedFilter] = useState<"For you" | "Following">("For you");
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+  const [connectionTest, setConnectionTest] = useState<SupabaseConnectionTestResult | null>(null);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
   const visiblePosts = feedFilter === "For you" ? samplePosts : samplePosts.filter((post) => post.id === "post-bengaluru-cycling");
+
+  async function runConnectionTest() {
+    setIsTestingConnection(true);
+    setConnectionTest(null);
+
+    try {
+      setConnectionTest(await testSupabaseConnection());
+    } finally {
+      setIsTestingConnection(false);
+    }
+  }
 
   return (
     <AppScreen>
@@ -87,6 +101,29 @@ export default function HomeScreen() {
           onToggleLike={() => setLikedPosts((current) => ({ ...current, [post.id]: !current[post.id] }))}
         />
       ))}
+
+      <Card style={styles.connectionTestCard}>
+        <View style={styles.connectionTestHeader}>
+          <View style={styles.connectionTestCopy}>
+            <Text style={[styles.connectionTestTitle, { color: colors.text }]}>Temporary · Supabase connection check</Text>
+            <Text style={[styles.connectionTestHint, { color: colors.secondary }]}>Checks Auth reachability only; no sign-in or data access.</Text>
+          </View>
+          <AppButton
+            label={isTestingConnection ? "Checking…" : "Run check"}
+            variant="outline"
+            disabled={isTestingConnection}
+            onPress={() => { void runConnectionTest(); }}
+          />
+        </View>
+        {connectionTest ? (
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[styles.connectionTestResult, { color: connectionTest.success ? colors.success : colors.secondary }]}
+          >
+            {connectionTest.message}
+          </Text>
+        ) : null}
+      </Card>
     </AppScreen>
   );
 }
@@ -110,4 +147,10 @@ const styles = StyleSheet.create({
   composerBottom: { flexDirection: "row", alignItems: "center", gap: 18, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
   composerAction: { minHeight: 32, gap: 7 },
   composerActionText: { fontSize: 12, fontWeight: "600" },
+  connectionTestCard: { gap: 9, padding: 12 },
+  connectionTestHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  connectionTestCopy: { flex: 1, gap: 3 },
+  connectionTestTitle: { fontSize: 12, fontWeight: "700" },
+  connectionTestHint: { fontSize: 11, lineHeight: 15 },
+  connectionTestResult: { fontSize: 12, lineHeight: 17 },
 });
