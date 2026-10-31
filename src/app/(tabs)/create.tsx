@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
-import { Icon } from "../components/Icon";
-import { AppScreen, AppButton, Card, ChoiceChip, LocalPreviewNotice, PageHeading } from "../components/ui";
-import { useAppColors } from "../theme/colors";
+import { Icon } from "../../components/Icon";
+import { AppScreen, AppButton, Card, ChoiceChip, MutedText, PageHeading } from "../../components/ui";
+import { useAppColors } from "../../theme/colors";
 
 const audiences = ["Everyone", "Connections", "Only me"] as const;
 
@@ -16,7 +16,6 @@ export default function CreateScreen() {
   return (
     <AppScreen>
       <PageHeading title="Create a post" subtitle="Start a conversation with your community." eyebrow="Share a moment" />
-      <LocalPreviewNotice>Your draft stays on this screen. Nothing is published or saved to a server.</LocalPreviewNotice>
 
       <Card style={styles.composerCard}>
         <View style={styles.inputHeader}>
@@ -47,7 +46,7 @@ export default function CreateScreen() {
         </View>
         {photoPreview ? (
           <View style={[styles.photoPlaceholder, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
-            <Icon name="photo" color={colors.accentStrong} size={25} />
+            <Icon name="photo" color={colors.accent} size={24} />
             <Text style={[styles.photoText, { color: colors.secondary }]}>Mock attachment preview</Text>
           </View>
         ) : null}
@@ -74,10 +73,11 @@ export default function CreateScreen() {
         icon="sparkles"
         onPress={() => setPreviewVisible((current) => !current)}
       />
+      <MutedText>Preview only · not published or saved.</MutedText>
 
       {previewVisible ? (
         <Card style={styles.previewCard}>
-          <Text style={[styles.previewEyebrow, { color: colors.accentStrong }]}>LOCAL PREVIEW · {audience.toUpperCase()}</Text>
+          <Text style={[styles.previewEyebrow, { color: colors.accent }]}>LOCAL PREVIEW · {audience.toUpperCase()}</Text>
           <Text style={[styles.previewText, { color: colors.text }]}>{draft.trim() || "Your message will appear here."}</Text>
           {photoPreview ? <Text style={[styles.previewMeta, { color: colors.secondary }]}>Photo attachment placeholder</Text> : null}
         </Card>
@@ -89,18 +89,18 @@ export default function CreateScreen() {
 const styles = StyleSheet.create({
   composerCard: { gap: 12 },
   inputHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
-  fieldLabel: { fontSize: 15, fontWeight: "700" },
+  fieldLabel: { fontSize: 14, fontWeight: "700" },
   characterCount: { fontSize: 12, fontVariant: ["tabular-nums"] },
-  textArea: { minHeight: 175, borderWidth: 1, borderRadius: 16, padding: 14, fontSize: 15, lineHeight: 23 },
+  textArea: { minHeight: 160, borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 14, lineHeight: 22 },
   attachmentRow: { paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 10 },
   attachmentHint: { fontSize: 12 },
-  photoPlaceholder: { minHeight: 118, borderWidth: 1, borderRadius: 16, alignItems: "center", justifyContent: "center", gap: 8 },
+  photoPlaceholder: { minHeight: 110, borderWidth: 1, borderRadius: 14, alignItems: "center", justifyContent: "center", gap: 8 },
   photoText: { fontSize: 12, fontWeight: "600" },
   audienceBlock: { gap: 9 },
   helperText: { fontSize: 13, lineHeight: 19, marginTop: -4 },
   audienceChoices: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   previewCard: { gap: 10 },
   previewEyebrow: { fontSize: 11, letterSpacing: 0.5, fontWeight: "800" },
-  previewText: { fontSize: 15, lineHeight: 23 },
+  previewText: { fontSize: 14, lineHeight: 22 },
   previewMeta: { fontSize: 12 },
 });

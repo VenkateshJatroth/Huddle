@@ -1,26 +1,13 @@
-
 import "react-native-url-polyfill/auto";
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./database.types";
 import { getSupabaseAuthStorage } from "./supabase-storage";
 
-function requirePublicSetting(name: string, value: string | undefined): string {
-  if (!value?.trim()) {
-    throw new Error(
-      `[Supabase] Missing ${name}. Add it to .env.local and restart Expo. Use a publishable key in the app, never a secret or service-role key.`,
-    );
-  }
+const fallbackUrl = "https://fknckdbrdeatgpbhaqbi.supabase.co";
+const fallbackKey = "sb_publishable_EbhCdhg4H0tot9sqUUqWFA_9fkCztG_";
 
-  return value;
-}
-
-const supabaseUrl = requirePublicSetting(
-  "EXPO_PUBLIC_SUPABASE_URL",
-  process.env.EXPO_PUBLIC_SUPABASE_URL,
-);
-const supabasePublishableKey = requirePublicSetting(
-  "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-);
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() || fallbackUrl;
+const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || fallbackKey;
 
 // This is intentionally public client configuration. Never put a Supabase
 // secret/service-role key in this app bundle.
@@ -31,7 +18,7 @@ export const supabasePublicConfig = {
 
 const authStorage = getSupabaseAuthStorage();
 
-export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabasePublishableKey, {
   auth: {
     ...(authStorage ? { storage: authStorage } : {}),
     autoRefreshToken: true,

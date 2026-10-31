@@ -2,32 +2,62 @@ import { createContext, createElement, useContext, useSyncExternalStore } from "
 import type { ReactNode } from "react";
 import { Platform, useColorScheme } from "react-native";
 
+/**
+ * GorMati Sleek Black & White Minimalist Design System
+ * High contrast monochromatic aesthetic: Pure Black (#000000), Charcoal (#121212),
+ * Pure White (#FFFFFF), and Off-White Gray (#E5E5EA).
+ */
+export const palette = {
+  pureBlack: "#000000",
+  charcoalDark: "#121212",
+  charcoalCard: "#18181A",
+  charcoalLight: "#1C1C1E",
+  pureWhite: "#FFFFFF",
+  offWhite: "#E5E5EA",
+  grayMuted: "#8E8E93",
+  graySecondary: "#7C7C82",
+  graySurface: "#F7F7F8",
+  grayBorderLight: "#E5E5EA",
+  grayBorderDark: "#262628",
+  freshGreen: "#10B981",
+} as const;
+
 export const lightColors = {
-  background: "#F8FAFC",
+  background: "#F7F7F8",
   surface: "#FFFFFF",
-  text: "#171717",
-  secondary: "#737373",
-  accent: "#F97316",
-  accentStrong: "#C2410C",
-  accentSoft: "#FFF7ED",
-  border: "#E5E7EB",
-  subtle: "#F1F5F9",
-  success: "#15803D",
-  avatarBackgrounds: ["#FFEDD5", "#DBEAFE", "#DCFCE7", "#FCE7F3", "#EDE9FE"],
+  text: "#000000",
+  secondary: "#7C7C82",
+  accent: "#000000",
+  accentStrong: "#000000",
+  accentSoft: "#E5E5EA",
+  border: "#E5E5EA",
+  subtle: "#F2F2F7",
+  success: "#10B981",
+  verified: "#000000",
+  avatarBackgrounds: ["#E5E5EA", "#F2F2F7", "#E0E0E4", "#ECECEE", "#D8D8DC"],
 } as const;
 
 export const darkColors = {
-  background: "#0B1220",
-  surface: "#111827",
-  text: "#F8FAFC",
-  secondary: "#A1A1AA",
-  accent: "#FB923C",
-  accentStrong: "#FDBA74",
-  accentSoft: "#2A1B12",
-  border: "#273244",
-  subtle: "#172033",
-  success: "#4ADE80",
-  avatarBackgrounds: ["#3B2A1B", "#1E3A5F", "#153B2B", "#47233C", "#34265D"],
+  background: "#000000",
+  surface: "#121212",
+  text: "#FFFFFF",
+  secondary: "#8E8E93",
+  accent: "#FFFFFF",
+  accentStrong: "#FFFFFF",
+  accentSoft: "#1C1C1E",
+  border: "#262628",
+  subtle: "#18181A",
+  success: "#10B981",
+  verified: "#FFFFFF",
+  avatarBackgrounds: ["#1C1C1E", "#262628", "#2C2C2E", "#1E1E20", "#333336"],
+} as const;
+
+export const navigationColors = {
+  background: "#FFFFFF",
+  border: "#E5E5EA",
+  active: "#000000",
+  activeBackground: "#E5E5EA",
+  inactive: "#8E8E93",
 } as const;
 
 export type AppColors = typeof lightColors | typeof darkColors;
@@ -45,9 +75,6 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     getServerHydrationSnapshot,
   );
 
-  // React Native Web cannot know the browser's preferred scheme while rendering
-  // HTML on the server. Use the same light snapshot on the server and the first
-  // client render, then apply the browser preference after hydration.
   const colors = Platform.OS === "web" && !hasHydrated
     ? lightColors
     : systemScheme === "dark" ? darkColors : lightColors;

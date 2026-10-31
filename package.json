@@ -1,5 +1,5 @@
 {
-  "name": "indiana",
+  "name": "gormati",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
@@ -12,6 +12,7 @@
     "expo-font": "~58.0.9",
     "expo-glass-effect": "~58.0.5",
     "expo-image": "~58.0.18",
+    "expo-image-picker": "~58.0.10",
     "expo-linking": "~58.0.15",
     "expo-localization": "~58.0.5",
     "expo-location": "~58.0.20",
@@ -23,10 +24,11 @@
     "expo-status-bar": "~58.0.4",
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.7",
+    "expo-updates": "~58.0.19",
     "expo-web-browser": "~58.0.7",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-native": "0.88.0",
+    "react-native": "0.88.1",
     "react-native-gesture-handler": "~3.3.0",
     "react-native-reanimated": "4.7.1",
     "react-native-safe-area-context": "~5.10.1",

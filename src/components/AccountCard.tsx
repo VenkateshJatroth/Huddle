@@ -1,34 +1,20 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { SuggestedAccount } from "../data/mockData";
 import { useAppColors } from "../theme/colors";
-import { Avatar, AppButton, Card, ChoiceChip, rowStyles } from "./ui";
+import { DemoAvatar } from "./DemoAvatar";
+import { Card, ChoiceChip, rowStyles } from "./ui";
 
-export function AccountCard({
-  account,
-  following,
-  onToggleFollow,
-}: {
-  account: SuggestedAccount;
-  following: boolean;
-  onToggleFollow: () => void;
-}) {
+export function AccountCard({ account }: { account: SuggestedAccount }) {
   const colors = useAppColors();
 
   return (
     <Card style={styles.card}>
       <View style={[rowStyles.row, styles.accountRow]}>
-        <Avatar name={account.name} tone={account.tone} size={48} />
+        <DemoAvatar id={account.id} name={account.name} tone={account.tone} size={48} />
         <View style={styles.details}>
           <Text style={[styles.name, { color: colors.text }]}>{account.name}</Text>
           <Text style={[styles.handle, { color: colors.secondary }]}>@{account.username}</Text>
         </View>
-        <AppButton
-          label={following ? "Following" : "Follow"}
-          variant={following ? "outline" : "primary"}
-          icon={following ? "check" : undefined}
-          selected={following}
-          onPress={onToggleFollow}
-        />
       </View>
       <Text style={[styles.description, { color: colors.text }]}>{account.description}</Text>
       <View style={[rowStyles.row, styles.metaRow]}>

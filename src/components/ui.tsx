@@ -1,7 +1,9 @@
 import type { PropsWithChildren, ReactNode } from "react";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Image, type ImageSource } from "expo-image";
 import { useAppColors } from "../theme/colors";
 import { Icon, type AppIconName } from "./Icon";
 
@@ -39,7 +41,7 @@ export function PageHeading({
   return (
     <View style={styles.headingRow}>
       <View style={styles.headingText}>
-        {eyebrow ? <Text style={[styles.eyebrow, { color: colors.accentStrong }]}>{eyebrow}</Text> : null}
+        {eyebrow ? <Text style={[styles.eyebrow, { color: colors.secondary }]}>{eyebrow}</Text> : null}
         <Text style={[styles.pageTitle, { color: colors.text }]}>{title}</Text>
         {subtitle ? <Text style={[styles.pageSubtitle, { color: colors.secondary }]}>{subtitle}</Text> : null}
       </View>
@@ -59,8 +61,23 @@ export function SectionHeading({ title, action }: { title: string; action?: Reac
   );
 }
 
-export function Avatar({ name, tone = 0, size = 44 }: { name: string; tone?: number; size?: number }) {
+export function Avatar({
+  name,
+  tone = 0,
+  size = 44,
+  imageSource,
+  imageKey,
+  imageTileIndex,
+}: {
+  name: string;
+  tone?: number;
+  size?: number;
+  imageSource?: ImageSource | string | number;
+  imageKey?: string;
+  imageTileIndex?: number;
+}) {
   const colors = useAppColors();
+  const [failedImageKey, setFailedImageKey] = useState<string>();
   const initials = name
     .split(" ")
     .filter(Boolean)
@@ -69,17 +86,55 @@ export function Avatar({ name, tone = 0, size = 44 }: { name: string; tone?: num
     .join("")
     .toUpperCase();
   const backgroundColor = colors.avatarBackgrounds[tone % colors.avatarBackgrounds.length];
+  const resolvedImageKey = imageKey ?? name;
+  const showImage = imageSource !== undefined && failedImageKey !== resolvedImageKey;
+  const imageArea = Math.max(size - 4, 0);
+  const isImageSheet = imageTileIndex !== undefined;
+  const imageTileSize = isImageSheet ? imageArea : size;
+  const imageWidth = isImageSheet ? imageTileSize * 3 : imageTileSize;
+  const imageLeft = isImageSheet ? -(imageTileIndex % 3) * imageTileSize : 0;
+  const imageTop = isImageSheet ? -Math.floor(imageTileIndex / 3) * imageTileSize : 0;
 
   return (
     <View
       accessible
+      accessibilityRole="image"
       accessibilityLabel={`${name}'s avatar`}
       style={[
         styles.avatar,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor, borderColor: colors.border },
+        {
+          width: size,
+          height: size,
+          backgroundColor,
+          borderColor: colors.border,
+          borderRadius: 14,
+        },
       ]}
     >
-      <Text style={[styles.avatarText, { color: colors.accentStrong, fontSize: size * 0.34 }]}>{initials}</Text>
+      {showImage ? (
+        <Image
+          accessible={false}
+          source={imageSource}
+          contentFit={isImageSheet ? "fill" : "cover"}
+          accessibilityLabel={`${name}'s portrait`}
+          onError={() => setFailedImageKey(resolvedImageKey)}
+          style={[styles.avatarImage, { width: imageWidth, height: imageWidth, left: imageLeft, top: imageTop }]}
+        />
+      ) : (
+        <Text style={[styles.avatarText, { color: colors.accent, fontSize: size * 0.34 }]}>{initials}</Text>
+      )}
+    </View>
+  );
+}
+
+export function VerifiedBadge({ size = 16 }: { size?: number }) {
+  const colors = useAppColors();
+  return (
+    <View
+      accessibilityLabel="Verified"
+      style={[styles.verifiedBadge, { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.verified }]}
+    >
+      <Icon name="check" color="#FFFFFF" size={size * 0.65} />
     </View>
   );
 }
@@ -108,10 +163,10 @@ export function IconButton({
         { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
       ]}
     >
-      <Icon name={name} color={colors.text} size={21} />
+      <Icon name={name} color={colors.text} size={20} />
       {badge ? (
         <View style={[styles.badge, { backgroundColor: colors.accent }]}>
-          <Text style={[styles.badgeText, { color: "#171717" }]}>{badge}</Text>
+          <Text style={[styles.badgeText, { color: "#FFFFFF" }]}>{badge}</Text>
         </View>
       ) : null}
     </Pressable>
@@ -141,7 +196,7 @@ export function AppButton({
   const textOnly = variant === "text";
   const backgroundColor = filled ? colors.accent : subtle ? colors.subtle : "transparent";
   const borderColor = variant === "outline" ? colors.border : "transparent";
-  const foreground = filled ? "#171717" : variant === "text" ? colors.accentStrong : colors.text;
+  const foreground = filled ? "#FFFFFF" : variant === "text" ? colors.accent : colors.text;
 
   return (
     <Pressable
@@ -176,10 +231,11 @@ export function ChoiceChip({
   icon?: AppIconName;
 }) {
   const colors = useAppColors();
+  const chipForeground = selected ? "#FFFFFF" : colors.secondary;
   const content = (
     <>
-      {icon ? <Icon name={icon} color={selected ? colors.accentStrong : colors.secondary} size={15} /> : null}
-      <Text style={[styles.chipText, { color: selected ? colors.accentStrong : colors.secondary }]}>{label}</Text>
+      {icon ? <Icon name={icon} color={chipForeground} size={15} /> : null}
+      <Text style={[styles.chipText, { color: chipForeground }]}>{label}</Text>
     </>
   );
 
@@ -198,7 +254,7 @@ export function ChoiceChip({
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: selected ? colors.accentSoft : colors.surface,
+          backgroundColor: selected ? colors.accent : colors.surface,
           borderColor: selected ? colors.accent : colors.border,
           opacity: pressed ? 0.72 : 1,
         },
@@ -214,11 +270,41 @@ export function Card({ children, style }: PropsWithChildren<{ style?: StyleProp<
   return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, style]}>{children}</View>;
 }
 
+export function ChatBubble({
+  message,
+  sent = true,
+  timestamp,
+}: {
+  message: string;
+  sent?: boolean;
+  timestamp?: string;
+}) {
+  const colors = useAppColors();
+  const backgroundColor = sent ? colors.accent : colors.subtle;
+  const textColor = sent ? "#FFFFFF" : colors.text;
+  const metaColor = sent ? "rgba(255,255,255,0.7)" : colors.secondary;
+
+  return (
+    <View
+      style={[
+        styles.chatBubble,
+        sent ? styles.chatBubbleSent : styles.chatBubbleReceived,
+        { backgroundColor },
+      ]}
+    >
+      <Text style={[styles.chatBubbleText, { color: textColor }]}>{message}</Text>
+      {timestamp ? (
+        <Text style={[styles.chatBubbleTime, { color: metaColor }]}>{timestamp}</Text>
+      ) : null}
+    </View>
+  );
+}
+
 export function LocalPreviewNotice({ children }: PropsWithChildren) {
   const colors = useAppColors();
   return (
     <View style={[styles.notice, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
-      <Icon name="sparkles" color={colors.accentStrong} size={17} />
+      <Icon name="sparkles" color={colors.accent} size={17} />
       <Text style={[styles.noticeText, { color: colors.secondary }]}>{children}</Text>
     </View>
   );
@@ -239,27 +325,34 @@ export const rowStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  scrollContent: { width: "100%", maxWidth: 640, alignSelf: "center", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 30, gap: 20 },
+  scrollContent: { width: "100%", maxWidth: 640, alignSelf: "center", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 30, gap: 18 },
   headingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   headingText: { flex: 1, gap: 4 },
-  eyebrow: { fontSize: 12, fontWeight: "700", letterSpacing: 0.7, textTransform: "uppercase" },
-  pageTitle: { fontSize: 28, lineHeight: 34, fontWeight: "700", letterSpacing: -0.6 },
-  pageSubtitle: { fontSize: 14, lineHeight: 20 },
+  eyebrow: { fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase" },
+  pageTitle: { fontSize: 26, lineHeight: 32, fontWeight: "700", letterSpacing: -0.5 },
+  pageSubtitle: { fontSize: 13, lineHeight: 19 },
   sectionHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 },
-  sectionTitle: { fontSize: 17, lineHeight: 23, fontWeight: "700" },
-  avatar: { borderWidth: 1, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  sectionTitle: { fontSize: 16, lineHeight: 22, fontWeight: "700" },
+  avatar: { borderWidth: 1, alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" },
+  avatarImage: { position: "absolute" },
   avatarText: { fontWeight: "700" },
-  iconButton: { width: 44, height: 44, borderWidth: 1, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  badge: { position: "absolute", top: -1, right: -1, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  badgeText: { fontSize: 10, fontWeight: "800" },
-  button: { minHeight: 42, borderWidth: 1, borderRadius: 15, paddingHorizontal: 15, paddingVertical: 9, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
-  buttonText: { fontSize: 14, fontWeight: "700" },
+  verifiedBadge: { alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  iconButton: { width: 42, height: 42, borderWidth: 1, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  badge: { position: "absolute", top: -2, right: -2, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  badgeText: { fontSize: 10, fontWeight: "700" },
+  button: { minHeight: 42, borderWidth: 1, borderRadius: 12, paddingHorizontal: 15, paddingVertical: 9, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  buttonText: { fontSize: 13, fontWeight: "600" },
   textButton: { paddingHorizontal: 2, borderWidth: 0 },
   textButtonLabel: { fontSize: 13 },
-  chip: { minHeight: 38, borderWidth: 1, borderRadius: 19, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  chipText: { fontSize: 13, fontWeight: "600" },
-  card: { borderWidth: 1, borderRadius: 22, padding: 16, gap: 14 },
-  notice: { borderWidth: 1, borderRadius: 15, padding: 13, flexDirection: "row", alignItems: "center", gap: 9 },
-  noticeText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  chip: { minHeight: 34, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  chipText: { fontSize: 12, fontWeight: "600" },
+  card: { borderWidth: 1, borderRadius: 14, padding: 16, gap: 14 },
+  chatBubble: { maxWidth: "80%", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, gap: 4 },
+  chatBubbleSent: { alignSelf: "flex-end", borderBottomRightRadius: 4 },
+  chatBubbleReceived: { alignSelf: "flex-start", borderBottomLeftRadius: 4 },
+  chatBubbleText: { fontSize: 14, lineHeight: 20 },
+  chatBubbleTime: { fontSize: 10, alignSelf: "flex-end" },
+  notice: { borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 9 },
+  noticeText: { flex: 1, fontSize: 12, lineHeight: 18 },
   mutedText: { fontSize: 13, lineHeight: 19 },
 });

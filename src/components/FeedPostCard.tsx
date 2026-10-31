@@ -1,24 +1,36 @@
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, type ImageSource } from "expo-image";
 import { useAppColors } from "../theme/colors";
 import type { CommunityPost } from "../data/mockData";
 import { Icon } from "./Icon";
+import { DemoAvatar } from "./DemoAvatar";
 import { Avatar, Card, rowStyles } from "./ui";
 
 export function FeedPostCard({
   post,
   liked = false,
   onToggleLike,
+  demoAvatarId,
+  mediaSource,
+  mediaAccessibilityLabel,
 }: {
   post: CommunityPost;
   liked?: boolean;
   onToggleLike: () => void;
+  demoAvatarId?: string;
+  mediaSource?: ImageSource | string | number;
+  mediaAccessibilityLabel?: string;
 }) {
   const colors = useAppColors();
 
   return (
     <Card style={styles.postCard}>
       <View style={[rowStyles.row, styles.authorRow]}>
-        <Avatar name={post.author} tone={post.tone} />
+        {demoAvatarId ? (
+          <DemoAvatar id={demoAvatarId} name={post.author} tone={post.tone} />
+        ) : (
+          <Avatar name={post.author} tone={post.tone} />
+        )}
         <View style={styles.authorDetails}>
           <View style={[rowStyles.row, styles.nameLine]}>
             <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>{post.author}</Text>
@@ -39,8 +51,17 @@ export function FeedPostCard({
 
       <Text style={[styles.postText, { color: colors.text }]}>{post.text}</Text>
 
+      {mediaSource ? (
+        <Image
+          source={mediaSource}
+          contentFit="cover"
+          accessibilityLabel={mediaAccessibilityLabel ?? `Sample photo for ${post.author}'s post`}
+          style={[styles.mediaImage, { backgroundColor: colors.subtle }]}
+        />
+      ) : null}
+
       <View style={[rowStyles.row, styles.locationLine]}>
-        <Icon name="location" color={colors.accentStrong} size={15} />
+        <Icon name="location" color={colors.secondary} size={15} />
         <Text style={[styles.contextText, { color: colors.secondary }]}>{post.location}</Text>
         <View style={[styles.dot, { backgroundColor: colors.secondary }]} />
         <Text style={[styles.contextText, { color: colors.secondary }]}>{post.language}</Text>
@@ -55,8 +76,8 @@ export function FeedPostCard({
           hitSlop={5}
           style={styles.actionButton}
         >
-          <Icon name="heart" color={liked ? colors.accentStrong : colors.secondary} size={18} />
-          <Text style={[styles.actionText, { color: liked ? colors.accentStrong : colors.secondary }]}>
+          <Icon name="heart" color={liked ? colors.accent : colors.secondary} size={18} />
+          <Text style={[styles.actionText, { color: liked ? colors.accent : colors.secondary }]}>
             {post.likes + (liked ? 1 : 0)}
           </Text>
         </Pressable>
@@ -93,6 +114,7 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12, lineHeight: 17 },
   moreButton: { width: 32, height: 36, alignItems: "center", justifyContent: "center" },
   postText: { fontSize: 15, lineHeight: 23 },
+  mediaImage: { width: "100%", aspectRatio: 16 / 9, borderRadius: 12 },
   locationLine: { gap: 6, flexWrap: "wrap" },
   contextText: { fontSize: 12, lineHeight: 18 },
   dot: { width: 3, height: 3, borderRadius: 2, marginHorizontal: 1 },

@@ -47,3 +47,6 @@ example
 
 # Local Android debugging log
 android-log.txt
+
+# Local design references
+assets/images/UI reference.png
