@@ -1,6 +1,15 @@
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Modal,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useAuth } from "../../auth/AuthProvider";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import { GormatiDiscoverCard } from "../../components/GormatiDiscoverCard";
@@ -16,7 +25,14 @@ import {
   SectionHeading,
 } from "../../components/ui";
 import { samplePosts } from "../../data/mockData";
-import { fetchFeedPosts, subscribeToPosts, type PublishedPost } from "../../lib/posts";
+import {
+  deletePost,
+  editPost,
+  fetchFeedPosts,
+  subscribeToPosts,
+  type PostAudience,
+  type PublishedPost,
+} from "../../lib/posts";
 import {
   demoDiscoverProfiles,
   fetchDiscoverProfiles,
@@ -24,7 +40,6 @@ import {
 import type { DiscoverProfile } from "../../lib/gormati-profiles";
 import { followProfile } from "../../lib/relationships";
 import { loadBlockedUserIds, subscribeToBlockedUsers } from "../../lib/safety";
-import { testSupabaseConnection, type SupabaseConnectionTestResult } from "../../lib/test-supabase";
 import { useAppColors } from "../../theme/colors";
 
 export default function HomeScreen() {
@@ -32,9 +47,13 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const [feedFilter, setFeedFilter] = useState<"For you" | "Following">("For you");
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
-  const [connectionTest, setConnectionTest] = useState<SupabaseConnectionTestResult | null>(null);
-  const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [communityPosts, setCommunityPosts] = useState<PublishedPost[]>([]);
+
+  // Post Editing Modal State
+  const [editingPost, setEditingPost] = useState<PublishedPost | null>(null);
+  const [editText, setEditText] = useState("");
+  const [editAudience, setEditAudience] = useState<PostAudience>("Everyone");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Discover members for home screen spotlight
   const [spotlightProfiles, setSpotlightProfiles] = useState<DiscoverProfile[]>([]);
@@ -128,23 +147,39 @@ export default function HomeScreen() {
     setPassedProfileIds((prev) => ({ ...prev, [profile.id]: true }));
   };
 
+  const handleOpenEdit = (post: PublishedPost) => {
+    setEditingPost(post);
+    setEditText(post.text);
+    setEditAudience(post.audience || "Everyone");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPost || !editText.trim() || isSavingEdit) return;
+    setIsSavingEdit(true);
+    try {
+      await editPost(editingPost.id, editText.trim(), editAudience);
+      setEditingPost(null);
+    } catch {
+      Alert.alert("Error", "Could not save your changes. Please try again.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeletePost = async (post: PublishedPost) => {
+    try {
+      await deletePost(post.id);
+    } catch {
+      Alert.alert("Error", "Could not delete this post.");
+    }
+  };
+
   const visibleSpotlight = spotlightProfiles
     .filter((p) => !passedProfileIds[p.id])
     .filter((p) => !blockedIds.includes(p.id));
   const visiblePosts = feedFilter === "For you"
     ? samplePosts
     : samplePosts.filter((post) => post.id === "post-bengaluru-cycling");
-
-  async function runConnectionTest() {
-    setIsTestingConnection(true);
-    setConnectionTest(null);
-
-    try {
-      setConnectionTest(await testSupabaseConnection());
-    } finally {
-      setIsTestingConnection(false);
-    }
-  }
 
   const userGreetingName = user?.email ? user.email.split("@")[0] : "Member";
 
@@ -168,9 +203,9 @@ export default function HomeScreen() {
           <Text style={[styles.brandSubtitle, { color: colors.secondary }]}>Your people, your place</Text>
         </View>
         <IconButton
-          name="bell"
-          label="Preview notifications"
-          onPress={() => Alert.alert("Notifications", "Notification activity is a local preview in this milestone.")}
+          name="settings"
+          label="App settings"
+          onPress={() => router.push("/settings" as never)}
         />
       </View>
 
@@ -256,32 +291,74 @@ export default function HomeScreen() {
           liked={Boolean(likedPosts[post.id])}
           demoAvatarId={post.id}
           mediaSource={post.image_url ? { uri: post.image_url } : undefined}
+          currentUserId={user?.id}
           onToggleLike={() => setLikedPosts((current) => ({ ...current, [post.id]: !current[post.id] }))}
+          onEditPost={handleOpenEdit}
+          onDeletePost={handleDeletePost}
         />
       ))}
 
-      <Card style={styles.connectionTestCard}>
-        <View style={styles.connectionTestHeader}>
-          <View style={styles.connectionTestCopy}>
-            <Text style={[styles.connectionTestTitle, { color: colors.text }]}>Temporary · Supabase connection check</Text>
-            <Text style={[styles.connectionTestHint, { color: colors.secondary }]}>Checks Auth reachability only; no sign-in or data access.</Text>
-          </View>
-          <AppButton
-            label={isTestingConnection ? "Checking…" : "Run check"}
-            variant="outline"
-            disabled={isTestingConnection}
-            onPress={() => { void runConnectionTest(); }}
-          />
+      {/* Edit Post Modal */}
+      <Modal
+        visible={Boolean(editingPost)}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditingPost(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <Card style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Post</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                onPress={() => setEditingPost(null)}
+                hitSlop={8}
+              >
+                <Icon name="close" color={colors.secondary} size={20} />
+              </Pressable>
+            </View>
+
+            <TextInput
+              multiline
+              value={editText}
+              onChangeText={setEditText}
+              placeholder="What would you like to update?"
+              placeholderTextColor={colors.secondary}
+              style={[
+                styles.modalTextInput,
+                { color: colors.text, backgroundColor: colors.subtle, borderColor: colors.border },
+              ]}
+              maxLength={500}
+            />
+
+            <View style={styles.modalAudienceRow}>
+              <Text style={[styles.modalAudienceLabel, { color: colors.secondary }]}>Audience:</Text>
+              {(["Everyone", "Connections", "Only me"] as PostAudience[]).map((aud) => (
+                <ChoiceChip
+                  key={aud}
+                  label={aud}
+                  selected={editAudience === aud}
+                  onPress={() => setEditAudience(aud)}
+                />
+              ))}
+            </View>
+
+            <View style={styles.modalActionButtons}>
+              <AppButton
+                label="Cancel"
+                variant="outline"
+                onPress={() => setEditingPost(null)}
+              />
+              <AppButton
+                label={isSavingEdit ? "Saving…" : "Save Changes"}
+                disabled={isSavingEdit || !editText.trim()}
+                onPress={() => { void handleSaveEdit(); }}
+              />
+            </View>
+          </Card>
         </View>
-        {connectionTest ? (
-          <Text
-            accessibilityLiveRegion="polite"
-            style={[styles.connectionTestResult, { color: connectionTest.success ? colors.success : colors.secondary }]}
-          >
-            {connectionTest.message}
-          </Text>
-        ) : null}
-      </Card>
+      </Modal>
     </AppScreen>
   );
 }
@@ -307,10 +384,42 @@ const styles = StyleSheet.create({
   composerBottom: { flexDirection: "row", alignItems: "center", gap: 18, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
   composerAction: { minHeight: 32, gap: 7 },
   composerActionText: { fontSize: 12, fontWeight: "600" },
-  connectionTestCard: { gap: 9, padding: 12 },
-  connectionTestHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
-  connectionTestCopy: { flex: 1, gap: 3 },
-  connectionTestTitle: { fontSize: 12, fontWeight: "700" },
-  connectionTestHint: { fontSize: 11, lineHeight: 15 },
-  connectionTestResult: { fontSize: 12, lineHeight: 17 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalContent: {
+    padding: 20,
+    gap: 16,
+    borderRadius: 16,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  modalTitle: { fontSize: 17, fontWeight: "800" },
+  modalTextInput: {
+    minHeight: 120,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    textAlignVertical: "top",
+  },
+  modalAudienceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  modalAudienceLabel: { fontSize: 13, fontWeight: "600" },
+  modalActionButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 6,
+  },
 });

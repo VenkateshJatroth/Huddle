@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  Modal,
   Pressable,
   Share,
   StyleSheet,
@@ -28,6 +29,7 @@ import { deleteUserAccount } from "../../lib/safety";
 import { useAuth } from "../../auth/AuthProvider";
 import { DemoAvatar } from "../../components/DemoAvatar";
 import { FeedPostCard } from "../../components/FeedPostCard";
+import { Icon } from "../../components/Icon";
 import {
   AppScreen,
   AppButton,
@@ -40,7 +42,14 @@ import {
   PageHeading,
   SectionHeading,
 } from "../../components/ui";
-import { fetchUserPosts, subscribeToPosts, type PublishedPost } from "../../lib/posts";
+import {
+  deletePost,
+  editPost,
+  fetchUserPosts,
+  subscribeToPosts,
+  type PostAudience,
+  type PublishedPost,
+} from "../../lib/posts";
 import { profilePosts } from "../../data/mockData";
 import { demoProfilePostDescriptions, demoProfilePostImages } from "../../data/mockMedia";
 import {
@@ -140,6 +149,10 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
   const [relationshipCountState, setRelationshipCountState] = useState<"loading" | "ready" | "unavailable" | "error">("loading");
   const [relationshipCountError, setRelationshipCountError] = useState<string | null>(null);
   const [userCreatedPosts, setUserCreatedPosts] = useState<PublishedPost[]>([]);
+  const [editingPost, setEditingPost] = useState<PublishedPost | null>(null);
+  const [editText, setEditText] = useState("");
+  const [editAudience, setEditAudience] = useState<PostAudience>("Everyone");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
     let isCurrent = true;
@@ -264,7 +277,34 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
     }
   }
 
-  function startEditing() {
+  const handleOpenEdit = (post: PublishedPost) => {
+    setEditingPost(post);
+    setEditText(post.text);
+    setEditAudience(post.audience || "Everyone");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPost || !editText.trim() || isSavingEdit) return;
+    setIsSavingEdit(true);
+    try {
+      await editPost(editingPost.id, editText.trim(), editAudience);
+      setEditingPost(null);
+    } catch {
+      Alert.alert("Error", "Could not save your changes.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeletePost = async (post: PublishedPost) => {
+    try {
+      await deletePost(post.id);
+    } catch {
+      Alert.alert("Error", "Could not delete this post.");
+    }
+  };
+
+  const startEditing = () => {
     if (!profile) return;
     setDraft(draftFromProfile(profile));
     setSaveError(null);
@@ -764,7 +804,10 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
                   post={post}
                   liked={Boolean(likedPosts[post.id])}
                   mediaSource={post.image_url ? { uri: post.image_url } : undefined}
+                  currentUserId={user.id}
                   onToggleLike={() => setLikedPosts((current) => ({ ...current, [post.id]: !current[post.id] }))}
+                  onEditPost={handleOpenEdit}
+                  onDeletePost={handleDeletePost}
                 />
               ))}
             </>
@@ -793,6 +836,68 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
           <LocalPreviewNotice>This about text is sample content and is not part of your saved profile.</LocalPreviewNotice>
         </Card>
       )}
+
+      {/* Edit Post Modal */}
+      <Modal
+        visible={Boolean(editingPost)}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditingPost(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <Card style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Post</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                onPress={() => setEditingPost(null)}
+                hitSlop={8}
+              >
+                <Icon name="close" color={colors.secondary} size={20} />
+              </Pressable>
+            </View>
+
+            <TextInput
+              multiline
+              value={editText}
+              onChangeText={setEditText}
+              placeholder="What would you like to update?"
+              placeholderTextColor={colors.secondary}
+              style={[
+                styles.modalTextInput,
+                { color: colors.text, backgroundColor: colors.subtle, borderColor: colors.border },
+              ]}
+              maxLength={500}
+            />
+
+            <View style={styles.modalAudienceRow}>
+              <Text style={[styles.modalAudienceLabel, { color: colors.secondary }]}>Audience:</Text>
+              {(["Everyone", "Connections", "Only me"] as PostAudience[]).map((aud) => (
+                <ChoiceChip
+                  key={aud}
+                  label={aud}
+                  selected={editAudience === aud}
+                  onPress={() => setEditAudience(aud)}
+                />
+              ))}
+            </View>
+
+            <View style={styles.modalActionButtons}>
+              <AppButton
+                label="Cancel"
+                variant="outline"
+                onPress={() => setEditingPost(null)}
+              />
+              <AppButton
+                label={isSavingEdit ? "Saving…" : "Save Changes"}
+                disabled={isSavingEdit || !editText.trim()}
+                onPress={() => { void handleSaveEdit(); }}
+              />
+            </View>
+          </Card>
+        </View>
+      </Modal>
     </AppScreen>
   );
 }
@@ -954,4 +1059,42 @@ const styles = StyleSheet.create({
   tabs: { flexDirection: "row", gap: 8 },
   aboutCard: { gap: 13 },
   aboutText: { fontSize: 14, lineHeight: 22 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalContent: {
+    padding: 20,
+    gap: 16,
+    borderRadius: 16,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  modalTitle: { fontSize: 17, fontWeight: "800" },
+  modalTextInput: {
+    minHeight: 120,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    textAlignVertical: "top",
+  },
+  modalAudienceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  modalAudienceLabel: { fontSize: 13, fontWeight: "600" },
+  modalActionButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 6,
+  },
 });

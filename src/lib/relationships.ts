@@ -241,13 +241,23 @@ export async function followProfile(targetId: string, currentUserId?: string): P
 
   try {
     if (currentUserId) {
-      await (supabase as any)
+      const { error } = await (supabase as any)
         .from("follow_relationships")
-        .upsert({
+        .upsert(
+          {
+            follower_id: currentUserId,
+            following_id: targetId,
+            status: "accepted",
+          },
+          { onConflict: "follower_id,following_id" },
+        );
+      if (error) {
+        await (supabase as any).from("follow_relationships").insert({
           follower_id: currentUserId,
           following_id: targetId,
           status: "accepted",
         });
+      }
     }
     return "accepted";
   } catch {
@@ -280,6 +290,18 @@ export async function approveFollowRequest(requesterId: string, currentUserId?: 
         .update({ status: "accepted" })
         .eq("follower_id", requesterId)
         .eq("following_id", currentUserId);
+
+      // Create reciprocal connection so they appear as mutual matches and can chat
+      await (supabase as any)
+        .from("follow_relationships")
+        .upsert(
+          {
+            follower_id: currentUserId,
+            following_id: requesterId,
+            status: "accepted",
+          },
+          { onConflict: "follower_id,following_id" },
+        );
     }
     return true;
   } catch {

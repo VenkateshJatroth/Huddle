@@ -22,6 +22,7 @@ import {
   VerifiedBadge,
 } from "../../components/ui";
 import { fetchMemberProfile, recordLike } from "../../lib/gormati-profiles";
+import { followProfile } from "../../lib/relationships";
 import type { GormatiProfile } from "../../lib/gormati-profiles";
 import { useAppColors } from "../../theme/colors";
 
@@ -60,6 +61,7 @@ export default function MemberProfileDetailScreen() {
     setIsLiking(true);
     try {
       await recordLike(profile.id);
+      await followProfile(profile.id, user?.id);
       setIsLiked(true);
     } finally {
       setIsLiking(false);

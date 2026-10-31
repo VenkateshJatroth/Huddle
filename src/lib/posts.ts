@@ -21,7 +21,19 @@ export type PublishedPost = CommunityPost & {
   created_at: string;
 };
 
-const POSTS_STORAGE_KEY = "gormati_local_posts";
+export type PostReply = {
+  id: string;
+  post_id: string;
+  author_id: string;
+  author_name: string;
+  username: string;
+  text: string;
+  created_at: string;
+  time?: string;
+};
+
+const POSTS_STORAGE_KEY = "gormati_local_posts_v2";
+const REPLIES_STORAGE_KEY = "gormati_local_replies_v2";
 const postListeners: Set<() => void> = new Set();
 
 export function subscribeToPosts(listener: () => void): () => void {
@@ -38,6 +50,21 @@ function notifyPostListeners() {
     } catch {
       // Listener error guard
     }
+  });
+}
+
+export function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // Fallback
+    }
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
   });
 }
 
@@ -63,13 +90,29 @@ function getLocalStoredPosts(): PublishedPost[] {
   }
 }
 
-function saveLocalPost(post: PublishedPost): void {
+function saveLocalPosts(posts: PublishedPost[]): void {
   try {
-    const current = getLocalStoredPosts();
-    const updated = [post, ...current.filter((p) => p.id !== post.id)];
-    globalThis.localStorage?.setItem(POSTS_STORAGE_KEY, JSON.stringify(updated));
+    globalThis.localStorage?.setItem(POSTS_STORAGE_KEY, JSON.stringify(posts));
   } catch {
-    // Storage quota or parsing error
+    // Storage quota guard
+  }
+}
+
+function getLocalStoredReplies(): Record<string, PostReply[]> {
+  try {
+    const raw = globalThis.localStorage?.getItem(REPLIES_STORAGE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalReplies(repliesMap: Record<string, PostReply[]>): void {
+  try {
+    globalThis.localStorage?.setItem(REPLIES_STORAGE_KEY, JSON.stringify(repliesMap));
+  } catch {
+    // Storage guard
   }
 }
 
@@ -78,7 +121,7 @@ function saveLocalPost(post: PublishedPost): void {
  * Attaches photos to Supabase Storage if an image URI is provided.
  */
 export async function createPost(draft: PostDraft): Promise<PublishedPost> {
-  const postId = `post_${Date.now()}`;
+  const postId = generateUUID();
   let remoteImageUrl: string | null = null;
 
   // 1. Upload photo to Supabase storage if provided
@@ -111,9 +154,10 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
   };
 
   // 2. Persist locally first for immediate responsiveness
-  saveLocalPost(publishedPost);
+  const current = getLocalStoredPosts();
+  saveLocalPosts([publishedPost, ...current.filter((p) => p.id !== postId)]);
 
-  // 3. Attempt to save to Supabase posts table
+  // 3. Save to Supabase posts table
   try {
     await (supabase as any).from("posts").insert({
       id: postId,
@@ -126,11 +170,171 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
       created_at: nowIso,
     });
   } catch {
-    // Table may not be provisioned yet; local copy already stored
+    // Remote insert error caught gracefully; post remains in local cache
   }
 
   notifyPostListeners();
   return publishedPost;
+}
+
+/**
+ * Updates an existing post's text and/or audience.
+ */
+export async function editPost(
+  postId: string,
+  newText: string,
+  newAudience?: PostAudience,
+): Promise<boolean> {
+  const current = getLocalStoredPosts();
+  const existing = current.find((p) => p.id === postId);
+
+  if (existing) {
+    existing.text = newText.trim();
+    if (newAudience) existing.audience = newAudience;
+    saveLocalPosts(current);
+    notifyPostListeners();
+  }
+
+  try {
+    const updatePayload: Record<string, unknown> = {
+      text: newText.trim(),
+      updated_at: new Date().toISOString(),
+    };
+    if (newAudience) updatePayload.audience = newAudience;
+
+    await (supabase as any)
+      .from("posts")
+      .update(updatePayload)
+      .eq("id", postId);
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Deletes a post locally and from Supabase.
+ */
+export async function deletePost(postId: string): Promise<boolean> {
+  const current = getLocalStoredPosts();
+  saveLocalPosts(current.filter((p) => p.id !== postId));
+
+  // Clean replies
+  const replies = getLocalStoredReplies();
+  delete replies[postId];
+  saveLocalReplies(replies);
+
+  notifyPostListeners();
+
+  try {
+    await (supabase as any).from("posts").delete().eq("id", postId);
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Fetches replies for a given post.
+ */
+export async function fetchPostReplies(postId: string): Promise<PostReply[]> {
+  const localMap = getLocalStoredReplies();
+  const localReplies = localMap[postId] || [];
+
+  try {
+    const { data } = await (supabase as any)
+      .from("post_replies")
+      .select("*")
+      .eq("post_id", postId)
+      .order("created_at", { ascending: true });
+
+    if (data && Array.isArray(data) && data.length > 0) {
+      const remoteReplies: PostReply[] = data.map((r: any) => ({
+        id: r.id,
+        post_id: r.post_id,
+        author_id: r.author_id,
+        author_name: r.author_name || "Gormati Member",
+        username: r.username || "member",
+        text: r.text,
+        created_at: r.created_at,
+        time: formatTimeAgo(r.created_at),
+      }));
+
+      // Merge and deduplicate
+      const map = new Map<string, PostReply>();
+      localReplies.forEach((r) => map.set(r.id, r));
+      remoteReplies.forEach((r) => map.set(r.id, r));
+      return Array.from(map.values()).sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      );
+    }
+  } catch {
+    // Return local
+  }
+
+  return localReplies.map((r) => ({ ...r, time: formatTimeAgo(r.created_at) }));
+}
+
+/**
+ * Adds a reply to a post.
+ */
+export async function createPostReply(
+  postId: string,
+  text: string,
+  user: { id: string; name: string; username: string },
+): Promise<PostReply> {
+  const replyId = generateUUID();
+  const nowIso = new Date().toISOString();
+
+  const newReply: PostReply = {
+    id: replyId,
+    post_id: postId,
+    author_id: user.id,
+    author_name: user.name,
+    username: user.username,
+    text: text.trim(),
+    created_at: nowIso,
+    time: "Just now",
+  };
+
+  // 1. Save locally
+  const localMap = getLocalStoredReplies();
+  const existingReplies = localMap[postId] || [];
+  localMap[postId] = [...existingReplies, newReply];
+  saveLocalReplies(localMap);
+
+  // Update post replies count locally
+  const posts = getLocalStoredPosts();
+  const targetPost = posts.find((p) => p.id === postId);
+  if (targetPost) {
+    targetPost.replies = (targetPost.replies || 0) + 1;
+    saveLocalPosts(posts);
+  }
+
+  // 2. Persist to Supabase
+  try {
+    await (supabase as any).from("post_replies").insert({
+      id: replyId,
+      post_id: postId,
+      author_id: user.id,
+      author_name: user.name,
+      username: user.username,
+      text: text.trim(),
+      created_at: nowIso,
+    });
+
+    if (targetPost) {
+      await (supabase as any)
+        .from("posts")
+        .update({ replies_count: targetPost.replies })
+        .eq("id", postId);
+    }
+  } catch {
+    // Local copy maintained
+  }
+
+  notifyPostListeners();
+  return newReply;
 }
 
 /**
@@ -148,7 +352,7 @@ export async function fetchFeedPosts(
       .from("posts")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(30);
 
     if (data && Array.isArray(data)) {
       remotePosts = data.map((row: any) => ({
