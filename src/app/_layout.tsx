@@ -47,6 +47,7 @@ function RootNavigator() {
         <Stack.Screen name="onboarding" options={{ presentation: "modal" }} />
         <Stack.Screen name="member/[id]" options={{ presentation: "card" }} />
         <Stack.Screen name="chat/[id]" options={{ presentation: "card" }} />
+        <Stack.Screen name="settings" options={{ presentation: "card" }} />
       </Stack>
     </View>
   );

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { useAuth } from "../../auth/AuthProvider";
 import { RelationshipProfileCard } from "../../components/RelationshipProfileCard";
@@ -42,6 +42,7 @@ export default function ConnectionsScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const reload = useCallback(async () => {
     if (!user) return;
@@ -56,6 +57,12 @@ export default function ConnectionsScreen() {
       setLoadState(error instanceof RelationshipSchemaUnavailableError ? "migration-missing" : "error");
     }
   }, [user]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await reload();
+    setRefreshing(false);
+  }, [reload]);
 
   useFocusEffect(useCallback(() => {
     void reload();
@@ -83,7 +90,16 @@ export default function ConnectionsScreen() {
   const mutualConnections = overview?.connections.filter((c) => c.youFollow && c.followsYou) ?? [];
 
   return (
-    <AppScreen>
+    <AppScreen
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => { void onRefresh(); }}
+          tintColor={colors.accent}
+          colors={[colors.accent]}
+        />
+      }
+    >
       <PageHeading
         title="Connections"
         subtitle="Grow your circle, one conversation at a time."
@@ -180,13 +196,13 @@ export default function ConnectionsScreen() {
                       <AppButton
                         label={isBusy ? "Please wait…" : "Approve"}
                         disabled={busyKey !== null}
-                        onPress={() => { void performAction(key, () => approveFollowRequest(relationship.requester_id)); }}
+                        onPress={() => { void performAction(key, () => approveFollowRequest(relationship.requester_id, user?.id)); }}
                       />
                       <AppButton
                         label="Reject"
                         variant="outline"
                         disabled={busyKey !== null}
-                        onPress={() => { void performAction(key, () => rejectFollowRequest(relationship.requester_id)); }}
+                        onPress={() => { void performAction(key, () => rejectFollowRequest(relationship.requester_id, user?.id)); }}
                       />
                     </View>
                   )}
@@ -211,7 +227,7 @@ export default function ConnectionsScreen() {
                   actionVariant="outline"
                   actionDisabled={busyKey !== null}
                   onCardPress={() => router.push(("/member/" + profile.id) as never)}
-                  onAction={() => { void performAction(key, () => removeFollowRelationship(relationship.target_id)); }}
+                  onAction={() => { void performAction(key, () => removeFollowRelationship(relationship.target_id, user?.id)); }}
                 />
               );
             }) : (
@@ -243,8 +259,8 @@ export default function ConnectionsScreen() {
                   onMessage={() => router.push(("/chat/" + profile.id) as never)}
                   onAction={() => {
                     void performAction(key, () => youFollow
-                      ? removeFollowRelationship(profile.id)
-                      : followProfile(profile.id));
+                      ? removeFollowRelationship(profile.id, user?.id)
+                      : followProfile(profile.id, user?.id));
                   }}
                 />
               );

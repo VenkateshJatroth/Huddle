@@ -1,17 +1,16 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useAuth } from "../../auth/AuthProvider";
 import { GormatiDiscoverCard } from "../../components/GormatiDiscoverCard";
 import { Icon } from "../../components/Icon";
 import { RelationshipProfileCard } from "../../components/RelationshipProfileCard";
-import { AppScreen, Card, ChoiceChip, LocalPreviewNotice, PageHeading, SectionHeading } from "../../components/ui";
+import { AppButton, AppScreen, Card, ChoiceChip, LocalPreviewNotice, PageHeading, SectionHeading } from "../../components/ui";
 import { interestOptions } from "../../data/mockData";
 import type { DiscoverProfile } from "../../lib/gormati-profiles";
 import {
   demoDiscoverProfiles,
   fetchDiscoverProfiles,
-  recordLike,
 } from "../../lib/gormati-profiles";
 import type { DirectoryProfile } from "../../lib/relationships";
 import {
@@ -33,6 +32,8 @@ export default function DiscoverScreen() {
   const [discoverProfiles, setDiscoverProfiles] = useState<DiscoverProfile[]>([]);
   const [isLoadingDiscover, setIsLoadingDiscover] = useState(true);
   const [isFallbackData, setIsFallbackData] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [likedIds, setLikedIds] = useState<Record<string, boolean>>({});
   const [passedIds, setPassedIds] = useState<Record<string, boolean>>({});
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
@@ -61,6 +62,7 @@ export default function DiscoverScreen() {
     setIsLoadingDiscover(true);
     try {
       const live = user ? await fetchDiscoverProfiles(user.id) : [];
+      setIsOffline(false);
       if (live && live.length > 0) {
         setDiscoverProfiles(live);
         setIsFallbackData(false);
@@ -70,12 +72,19 @@ export default function DiscoverScreen() {
         setIsFallbackData(true);
       }
     } catch {
+      setIsOffline(true);
       setDiscoverProfiles(demoDiscoverProfiles);
       setIsFallbackData(true);
     } finally {
       setIsLoadingDiscover(false);
     }
   }, [user]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadDiscoverFeed();
+    setRefreshing(false);
+  }, [loadDiscoverFeed]);
 
   useFocusEffect(
     useCallback(() => {
@@ -127,12 +136,12 @@ export default function DiscoverScreen() {
 
     try {
       if (profile.relationship_status) {
-        await removeFollowRelationship(profile.id);
+        await removeFollowRelationship(profile.id, user.id);
         setDirectoryProfiles((current) => current.map((item) => item.id === profile.id
           ? { ...item, relationship_status: null }
           : item));
       } else {
-        const status = await followProfile(profile.id);
+        const status = await followProfile(profile.id, user.id);
         setDirectoryProfiles((current) => current.map((item) => item.id === profile.id
           ? { ...item, relationship_status: status }
           : item));
@@ -148,8 +157,8 @@ export default function DiscoverScreen() {
   const handleLike = async (profile: DiscoverProfile) => {
     setLikedIds((prev) => ({ ...prev, [profile.id]: true }));
     try {
-      // Record like in Supabase via RPC
-      await recordLike(profile.id);
+      // Record like in Supabase or demo state
+      await followProfile(profile.id, user?.id);
     } catch {
       // If error (or demo profile), keep client visual feedback intact
     }
@@ -172,7 +181,16 @@ export default function DiscoverScreen() {
   }, [discoverProfiles, passedIds, blockedIds, selectedInterest]);
 
   return (
-    <AppScreen>
+    <AppScreen
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => { void onRefresh(); }}
+          tintColor={colors.accent}
+          colors={[colors.accent]}
+        />
+      }
+    >
       <PageHeading
         title="Discover"
         subtitle="Connect with curated Gormati members."
@@ -288,7 +306,21 @@ export default function DiscoverScreen() {
           }
         />
 
-        {isFallbackData ? (
+        {isOffline ? (
+          <Card style={styles.offlineCard}>
+            <View style={styles.offlineRow}>
+              <Icon name="globe" size={18} color={colors.accent} />
+              <Text style={[styles.offlineText, { color: colors.text }]}>
+                Offline or sync pending. Showing cached preview profiles.
+              </Text>
+            </View>
+            <AppButton
+              label="Retry Connection"
+              variant="outline"
+              onPress={() => { void loadDiscoverFeed(); }}
+            />
+          </Card>
+        ) : isFallbackData ? (
           <LocalPreviewNotice>
             Showing preview Gormati member profiles. As new members join and create public profiles, they will appear here live.
           </LocalPreviewNotice>
@@ -340,6 +372,9 @@ const styles = StyleSheet.create({
   loadingRow: { minHeight: 60, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
   actionError: { fontSize: 13, lineHeight: 19 },
   feedBlock: { gap: 14 },
+  offlineCard: { padding: 16, gap: 12 },
+  offlineRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  offlineText: { fontSize: 13, flex: 1, lineHeight: 18 },
   resultCount: { fontSize: 12, fontWeight: "600" },
   emptyCard: { alignItems: "center", justifyContent: "center", padding: 24, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: "800" },

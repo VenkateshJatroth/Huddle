@@ -71,6 +71,9 @@ export type Database = {
       };
       follow_relationships: {
         Row: {
+          id?: string;
+          follower_id?: string;
+          following_id?: string;
           requester_id: string;
           target_id: string;
           status: "pending" | "accepted";
@@ -78,37 +81,68 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
-          requester_id?: never;
-          target_id?: never;
-          status?: never;
-          created_at?: never;
-          updated_at?: never;
+          id?: string;
+          follower_id?: string;
+          following_id?: string;
+          requester_id?: string;
+          target_id?: string;
+          status: "pending" | "accepted";
+          created_at?: string;
+          updated_at?: string;
         };
         Update: {
-          requester_id?: never;
-          target_id?: never;
-          status?: never;
-          created_at?: never;
-          updated_at?: never;
+          id?: string;
+          follower_id?: string;
+          following_id?: string;
+          requester_id?: string;
+          target_id?: string;
+          status?: "pending" | "accepted";
+          created_at?: string;
+          updated_at?: string;
         };
-        Relationships: [
-          {
-            foreignKeyName: "follow_relationships_requester_id_fkey";
-            columns: ["requester_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-            referencedSchema: "auth";
-          },
-          {
-            foreignKeyName: "follow_relationships_target_id_fkey";
-            columns: ["target_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-            referencedSchema: "auth";
-          },
-        ];
+        Relationships: [];
+      };
+      posts: {
+        Row: {
+          id: string;
+          author_id: string;
+          author_name: string;
+          username: string;
+          text: string;
+          audience: string;
+          image_url: string | null;
+          likes_count: number;
+          replies_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          author_id: string;
+          author_name: string;
+          username: string;
+          text: string;
+          audience?: string;
+          image_url?: string | null;
+          likes_count?: number;
+          replies_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          author_id?: string;
+          author_name?: string;
+          username?: string;
+          text?: string;
+          audience?: string;
+          image_url?: string | null;
+          likes_count?: number;
+          replies_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
     };
     Views: Record<string, never>;

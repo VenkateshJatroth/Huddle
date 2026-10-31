@@ -7,13 +7,17 @@ const fallbackUrl = "https://fknckdbrdeatgpbhaqbi.supabase.co";
 const fallbackKey = "sb_publishable_EbhCdhg4H0tot9sqUUqWFA_9fkCztG_";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() || fallbackUrl;
-const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || fallbackKey;
+const supabasePublishableKey =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+  fallbackKey;
 
 // This is intentionally public client configuration. Never put a Supabase
 // secret/service-role key in this app bundle.
 export const supabasePublicConfig = {
   url: supabaseUrl,
   publishableKey: supabasePublishableKey,
+  anonKey: supabasePublishableKey,
 };
 
 const authStorage = getSupabaseAuthStorage();

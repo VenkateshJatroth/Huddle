@@ -5,6 +5,7 @@ import {
   Image,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -69,6 +70,20 @@ export default function MemberProfileDetailScreen() {
     router.back();
   };
 
+  const handleShare = async () => {
+    if (!profile) return;
+    try {
+      const profileUrl = `https://gormati.app/m/${profile.username || profile.id}`;
+      await Share.share({
+        title: `${profile.display_name}'s Profile on GorMati`,
+        message: `Check out ${profile.display_name}'s profile on GorMati:\n${profileUrl}`,
+        url: profileUrl,
+      });
+    } catch {
+      // User cancelled or share error
+    }
+  };
+
   const handleMessage = () => {
     if (!profile) return;
     router.push(("/chat/" + profile.id) as never);
@@ -126,6 +141,14 @@ export default function MemberProfileDetailScreen() {
         </Text>
         <View style={styles.navRight}>
           {profile.is_verified ? <VerifiedBadge /> : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Share profile"
+            onPress={() => { void handleShare(); }}
+            style={styles.optionsButton}
+          >
+            <Icon name="share" color={colors.text} size={18} />
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Member safety options"

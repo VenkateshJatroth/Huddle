@@ -1,6 +1,6 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../../auth/AuthProvider";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import { GormatiDiscoverCard } from "../../components/GormatiDiscoverCard";
@@ -16,12 +16,13 @@ import {
   SectionHeading,
 } from "../../components/ui";
 import { samplePosts } from "../../data/mockData";
+import { fetchFeedPosts, subscribeToPosts, type PublishedPost } from "../../lib/posts";
 import {
   demoDiscoverProfiles,
   fetchDiscoverProfiles,
-  recordLike,
 } from "../../lib/gormati-profiles";
 import type { DiscoverProfile } from "../../lib/gormati-profiles";
+import { followProfile } from "../../lib/relationships";
 import { loadBlockedUserIds, subscribeToBlockedUsers } from "../../lib/safety";
 import { testSupabaseConnection, type SupabaseConnectionTestResult } from "../../lib/test-supabase";
 import { useAppColors } from "../../theme/colors";
@@ -33,12 +34,14 @@ export default function HomeScreen() {
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [connectionTest, setConnectionTest] = useState<SupabaseConnectionTestResult | null>(null);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [communityPosts, setCommunityPosts] = useState<PublishedPost[]>([]);
 
   // Discover members for home screen spotlight
   const [spotlightProfiles, setSpotlightProfiles] = useState<DiscoverProfile[]>([]);
   const [likedProfileIds, setLikedProfileIds] = useState<Record<string, boolean>>({});
   const [passedProfileIds, setPassedProfileIds] = useState<Record<string, boolean>>({});
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -51,7 +54,28 @@ export default function HomeScreen() {
 
   useEffect(() => {
     let isCurrent = true;
-    async function loadMembers() {
+    async function loadFeed() {
+      try {
+        const feed = await fetchFeedPosts(feedFilter, user?.id);
+        if (!isCurrent) return;
+        setCommunityPosts(feed);
+      } catch {
+        // Fallback
+      }
+    }
+    void loadFeed();
+    const unsubscribe = subscribeToPosts(() => {
+      void loadFeed();
+    });
+    return () => {
+      isCurrent = false;
+      unsubscribe();
+    };
+  }, [feedFilter, user]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    async function fetchSpotlight() {
       try {
         const live = user ? await fetchDiscoverProfiles(user.id, 5) : [];
         if (!isCurrent) return;
@@ -65,14 +89,36 @@ export default function HomeScreen() {
         setSpotlightProfiles(demoDiscoverProfiles);
       }
     }
-    void loadMembers();
-    return () => { isCurrent = false; };
+    void fetchSpotlight();
+    return () => {
+      isCurrent = false;
+    };
   }, [user]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const [live, feed] = await Promise.all([
+        user ? fetchDiscoverProfiles(user.id, 5) : Promise.resolve([]),
+        fetchFeedPosts(feedFilter, user?.id),
+      ]);
+      setCommunityPosts(feed);
+      if (live && live.length > 0) {
+        setSpotlightProfiles(live);
+      } else {
+        setSpotlightProfiles(demoDiscoverProfiles);
+      }
+    } catch {
+      setSpotlightProfiles(demoDiscoverProfiles);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user, feedFilter]);
 
   const handleLikeMember = async (profile: DiscoverProfile) => {
     setLikedProfileIds((prev) => ({ ...prev, [profile.id]: true }));
     try {
-      await recordLike(profile.id);
+      await followProfile(profile.id, user?.id);
     } catch {
       // Graceful fallback for demo profiles
     }
@@ -103,7 +149,16 @@ export default function HomeScreen() {
   const userGreetingName = user?.email ? user.email.split("@")[0] : "Member";
 
   return (
-    <AppScreen>
+    <AppScreen
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => { void onRefresh(); }}
+          tintColor={colors.accent}
+          colors={[colors.accent]}
+        />
+      }
+    >
       <View style={styles.brandRow}>
         <View style={[styles.brandMark, { backgroundColor: colors.accent }]}>
           <Icon name="sparkles" color="#FFFFFF" size={18} />
@@ -194,12 +249,13 @@ export default function HomeScreen() {
       </Card>
 
       <SectionHeading title="Community feed" />
-      {visiblePosts.map((post) => (
+      {(communityPosts.length > 0 ? communityPosts : (visiblePosts as PublishedPost[])).map((post) => (
         <FeedPostCard
           key={post.id}
           post={post}
           liked={Boolean(likedPosts[post.id])}
           demoAvatarId={post.id}
+          mediaSource={post.image_url ? { uri: post.image_url } : undefined}
           onToggleLike={() => setLikedPosts((current) => ({ ...current, [post.id]: !current[post.id] }))}
         />
       ))}

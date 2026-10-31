@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -24,7 +25,6 @@ import {
 } from "../../lib/gormati-profiles";
 import type { GormatiProfile, GormatiProfileDraft } from "../../lib/gormati-profiles";
 import { deleteUserAccount } from "../../lib/safety";
-import { checkForAppUpdates } from "../../lib/updates";
 import { useAuth } from "../../auth/AuthProvider";
 import { DemoAvatar } from "../../components/DemoAvatar";
 import { FeedPostCard } from "../../components/FeedPostCard";
@@ -40,6 +40,7 @@ import {
   PageHeading,
   SectionHeading,
 } from "../../components/ui";
+import { fetchUserPosts, subscribeToPosts, type PublishedPost } from "../../lib/posts";
 import { profilePosts } from "../../data/mockData";
 import { demoProfilePostDescriptions, demoProfilePostImages } from "../../data/mockMedia";
 import {
@@ -138,6 +139,28 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
   const [relationshipCounts, setRelationshipCounts] = useState<RelationshipCounts | null>(null);
   const [relationshipCountState, setRelationshipCountState] = useState<"loading" | "ready" | "unavailable" | "error">("loading");
   const [relationshipCountError, setRelationshipCountError] = useState<string | null>(null);
+  const [userCreatedPosts, setUserCreatedPosts] = useState<PublishedPost[]>([]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    async function load() {
+      try {
+        const posts = await fetchUserPosts(user.id);
+        if (!isCurrent) return;
+        setUserCreatedPosts(posts);
+      } catch {
+        // Fallback
+      }
+    }
+    void load();
+    const unsubscribe = subscribeToPosts(() => {
+      void load();
+    });
+    return () => {
+      isCurrent = false;
+      unsubscribe();
+    };
+  }, [user]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -249,6 +272,22 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
     setIsEditing(true);
   }
 
+  async function handleShareProfile() {
+    try {
+      const name = profile?.display_name || user.email?.split("@")[0] || "Gormati Member";
+      const handle = profile?.username ? `@${profile.username}` : "";
+      const profileUrl = `https://gormati.app/m/${profile?.username || user.id}`;
+
+      await Share.share({
+        title: `${name}'s Profile on GorMati`,
+        message: `Connect with ${name} ${handle ? `(${handle}) ` : ""}on GorMati — Your people, your place:\n${profileUrl}`,
+        url: profileUrl,
+      });
+    } catch {
+      // User cancelled or share error
+    }
+  }
+
   async function pickAndUploadAvatar() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -343,23 +382,9 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
         eyebrow="A little about you"
         trailing={
           <IconButton
-            name="more"
-            label="Profile options"
-            onPress={() => {
-              Alert.alert(
-                "App Options",
-                "Choose an action:",
-                [
-                  {
-                    text: "Check for Updates",
-                    onPress: () => {
-                      void checkForAppUpdates({ force: true, showNoUpdateAlert: true, promptUser: true });
-                    },
-                  },
-                  { text: "Cancel", style: "cancel" },
-                ],
-              );
-            }}
+            name="settings"
+            label="Settings"
+            onPress={() => router.push("/settings" as never)}
           />
         }
       />
@@ -525,7 +550,7 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
                 label="Share profile"
                 variant="subtle"
                 icon="share"
-                onPress={() => Alert.alert("Share profile", "Profile sharing is not connected yet.")}
+                onPress={() => { void handleShareProfile(); }}
               />
             </View>
           </Card>
@@ -554,7 +579,7 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
         </>
       ) : loadState !== "loading" ? (
         <SampleProfileCard
-          onShare={() => Alert.alert("Share profile", "Profile sharing is not connected yet.")}
+          onShare={() => { void handleShareProfile(); }}
         />
       ) : null}
 
@@ -730,7 +755,22 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
 
       {activeSection === "Posts" ? (
         <>
-          <SectionHeading title="Sample posts" />
+          {userCreatedPosts.length > 0 ? (
+            <>
+              <SectionHeading title="Your posts" />
+              {userCreatedPosts.map((post) => (
+                <FeedPostCard
+                  key={post.id}
+                  post={post}
+                  liked={Boolean(likedPosts[post.id])}
+                  mediaSource={post.image_url ? { uri: post.image_url } : undefined}
+                  onToggleLike={() => setLikedPosts((current) => ({ ...current, [post.id]: !current[post.id] }))}
+                />
+              ))}
+            </>
+          ) : null}
+
+          <SectionHeading title={userCreatedPosts.length > 0 ? "Sample community posts" : "Sample posts"} />
           <LocalPreviewNotice>These example posts are not connected to your profile or saved in Supabase.</LocalPreviewNotice>
           {profilePosts.map((post) => (
             <FeedPostCard

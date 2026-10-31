@@ -7,9 +7,12 @@ import { Image, type ImageSource } from "expo-image";
 import { useAppColors } from "../theme/colors";
 import { Icon, type AppIconName } from "./Icon";
 
-type AppScreenProps = PropsWithChildren<{ keyboardAware?: boolean }>;
+type AppScreenProps = PropsWithChildren<{
+  keyboardAware?: boolean;
+  refreshControl?: React.ReactElement;
+}>;
 
-export function AppScreen({ children }: AppScreenProps) {
+export function AppScreen({ children, refreshControl }: AppScreenProps) {
   const colors = useAppColors();
 
   return (
@@ -18,6 +21,7 @@ export function AppScreen({ children }: AppScreenProps) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        refreshControl={refreshControl}
       >
         {children}
       </ScrollView>

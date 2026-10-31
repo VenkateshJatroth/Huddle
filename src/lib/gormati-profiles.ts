@@ -146,7 +146,8 @@ export async function fetchDiscoverProfiles(
     .neq("id", currentUserId)
     .limit(limit);
 
-  if (error || !data) return [];
+  if (error) throw error;
+  if (!data) return [];
 
   return data.map((row) => ({
     id: row.id,
