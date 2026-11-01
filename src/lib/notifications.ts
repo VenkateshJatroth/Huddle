@@ -7,6 +7,180 @@ import Constants from "expo-constants";
 import { router } from "expo-router";
 import { supabase } from "./supabase";
 
+// =============================================================================
+// 1. In-App Notifications
+// =============================================================================
+
+export type InAppNotification = {
+  id: string;
+  user_id: string;
+  actor_id?: string | null;
+  actor_name: string;
+  type: "like" | "reply" | "follow" | "message";
+  reference_id?: string | null;
+  content?: string | null;
+  is_read: boolean;
+  created_at: string;
+  time?: string;
+};
+
+const demoNotifications: InAppNotification[] = [
+  {
+    id: "notif-1",
+    user_id: "me",
+    actor_name: "Sana Iqbal",
+    type: "message",
+    content: "Sent you a message: 'Hey there! Loved your take on exploring old neighborhoods...'",
+    is_read: false,
+    created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    time: "15m ago",
+  },
+  {
+    id: "notif-2",
+    user_id: "me",
+    actor_name: "Dev Menon",
+    type: "follow",
+    content: "Connected with you on GorMati.",
+    is_read: false,
+    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+    time: "2h ago",
+  },
+  {
+    id: "notif-3",
+    user_id: "me",
+    actor_name: "Priya Kulkarni",
+    type: "like",
+    content: "Liked your community post.",
+    is_read: true,
+    created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+    time: "1d ago",
+  },
+];
+
+function formatTimeAgo(dateString: string): string {
+  try {
+    const diffMs = Date.now() - new Date(dateString).getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return "Just now";
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  } catch {
+    return "Recently";
+  }
+}
+
+export async function fetchNotifications(userId: string): Promise<InAppNotification[]> {
+  try {
+    const { data, error } = await (supabase as any)
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    if (error || !data || data.length === 0) {
+      return demoNotifications;
+    }
+
+    return (data as any[]).map((n) => ({
+      ...n,
+      time: formatTimeAgo(n.created_at),
+    }));
+  } catch {
+    return demoNotifications;
+  }
+}
+
+export async function fetchUnreadNotificationCount(userId: string): Promise<number> {
+  try {
+    const { count, error } = await (supabase as any)
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_read", false);
+
+    if (error || count == null) {
+      return demoNotifications.filter((n) => !n.is_read).length;
+    }
+
+    return count;
+  } catch {
+    return demoNotifications.filter((n) => !n.is_read).length;
+  }
+}
+
+export async function markAllNotificationsAsRead(userId: string): Promise<void> {
+  demoNotifications.forEach((n) => { n.is_read = true; });
+
+  try {
+    await (supabase as any)
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("user_id", userId)
+      .eq("is_read", false);
+  } catch {
+    // Non-blocking
+  }
+}
+
+export async function createNotification(payload: {
+  userId: string;
+  actorId?: string;
+  actorName: string;
+  type: "like" | "reply" | "follow" | "message";
+  referenceId?: string;
+  content?: string;
+}): Promise<void> {
+  try {
+    await (supabase as any).from("notifications").insert({
+      user_id: payload.userId,
+      actor_id: payload.actorId,
+      actor_name: payload.actorName,
+      type: payload.type,
+      reference_id: payload.referenceId,
+      content: payload.content,
+    });
+  } catch {
+    // Non-blocking
+  }
+}
+
+export function subscribeToNotifications(
+  userId: string,
+  onNewNotification: (notif: InAppNotification) => void,
+): () => void {
+  const channel = supabase
+    .channel(`notifs_${userId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "notifications",
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        const row = payload.new as any;
+        onNewNotification({
+          ...row,
+          time: "Just now",
+        });
+      },
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
+// =============================================================================
+// 2. Push Notifications & Observers
+// =============================================================================
+
 // Configure how notifications appear when the app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -18,10 +192,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-/**
- * Checks if the app is currently running inside the Expo Go sandbox.
- * Expo Go on Android does not support remote push notifications or custom channels since SDK 53.
- */
 function isRunningInExpoGo(): boolean {
   return (
     Constants.appOwnership === "expo" ||
@@ -29,39 +199,29 @@ function isRunningInExpoGo(): boolean {
   );
 }
 
-/**
- * Request notification permissions, obtain the Expo Push Token,
- * and sync it with the user's Supabase profile row.
- */
 export async function registerForPushNotificationsAsync(userId: string): Promise<string | null> {
   if (Platform.OS === "web") {
     return null;
   }
 
-  // Gracefully skip in Expo Go on Android where remote notifications & channels are unsupported
   if (isRunningInExpoGo()) {
-    console.log(
-      "[PushNotifications] Running inside Expo Go. Remote push notifications are disabled in Expo Go on Android. Use a development build (APK) or production build (AAB) for live push notifications.",
-    );
     return null;
   }
 
   if (!Device.isDevice) {
-    console.log("[PushNotifications] Must use a physical device for remote push notifications.");
     return null;
   }
 
-  // Create high-importance Android notification channel with defensive try/catch
   if (Platform.OS === "android") {
     try {
       await Notifications.setNotificationChannelAsync("default", {
-        name: "Gormati Notifications",
+        name: "GorMati Notifications",
         importance: AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: "#000000",
       });
-    } catch (channelErr) {
-      console.warn("[PushNotifications] Notification channel setup notice:", channelErr);
+    } catch {
+      // Channel setup guard
     }
   }
 
@@ -75,7 +235,6 @@ export async function registerForPushNotificationsAsync(userId: string): Promise
     }
 
     if (finalStatus !== "granted") {
-      console.log("[PushNotifications] Notification permissions not granted.");
       return null;
     }
 
@@ -90,28 +249,18 @@ export async function registerForPushNotificationsAsync(userId: string): Promise
     const token = pushTokenData.data;
 
     if (token && userId) {
-      const { error } = await supabase
+      await supabase
         .from("profiles")
         .update({ push_token: token })
         .eq("id", userId);
-
-      if (error) {
-        console.warn("[PushNotifications] Failed to save push token to Supabase:", error.message);
-      } else {
-        console.log("[PushNotifications] Push token registered and saved for user:", userId);
-      }
     }
 
     return token;
-  } catch (err) {
-    console.warn("[PushNotifications] Error registering for push notifications:", err);
+  } catch {
     return null;
   }
 }
 
-/**
- * Route user based on notification response payload
- */
 function handleNotificationResponse(response: Notifications.NotificationResponse) {
   const data = response.notification.request.content.data as {
     url?: string;
@@ -130,40 +279,31 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
   }
 }
 
-/**
- * Hook to listen for notification responses (user tapping on a notification)
- * and deep link them directly to the chat or member screen.
- */
 export function useNotificationObserver() {
   const isMounted = useRef(true);
 
   useEffect(() => {
     isMounted.current = true;
 
-    // In Expo Go on Android, notification listeners can reject if native services are absent
     if (isRunningInExpoGo() && Platform.OS === "android") {
       return;
     }
 
-    // Check if the app was launched by tapping a notification
     Notifications.getLastNotificationResponseAsync()
       .then((response) => {
         if (isMounted.current && response) {
           handleNotificationResponse(response);
         }
       })
-      .catch((err) => {
-        console.log("[PushNotifications] Notice reading last notification response:", err);
-      });
+      .catch(() => {});
 
-    // Listen for notification taps while the app is running in background or foreground
     let subscription: { remove: () => void } | null = null;
     try {
       subscription = Notifications.addNotificationResponseReceivedListener((response) => {
         handleNotificationResponse(response);
       });
-    } catch (err) {
-      console.log("[PushNotifications] Notification response listener notice:", err);
+    } catch {
+      // Listener notice
     }
 
     return () => {
@@ -171,42 +311,4 @@ export function useNotificationObserver() {
       subscription?.remove();
     };
   }, []);
-}
-
-/**
- * Client helper to send an Expo push notification via the Expo Push API.
- * Primarily used for direct notifications or fallback/testing.
- */
-export async function sendExpoPushNotification({
-  to,
-  title,
-  body,
-  data = {},
-}: {
-  to: string;
-  title: string;
-  body: string;
-  data?: Record<string, unknown>;
-}) {
-  try {
-    const response = await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Accept-encoding": "gzip, deflate",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        to,
-        sound: "default",
-        title,
-        body,
-        data,
-      }),
-    });
-    return await response.json();
-  } catch (error) {
-    console.warn("[PushNotifications] Error sending push notification:", error);
-    return null;
-  }
 }

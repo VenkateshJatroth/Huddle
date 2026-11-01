@@ -278,15 +278,19 @@ export function ChatBubble({
   message,
   sent = true,
   timestamp,
+  imageUrl,
+  read = false,
 }: {
   message: string;
   sent?: boolean;
   timestamp?: string;
+  imageUrl?: string | null;
+  read?: boolean;
 }) {
   const colors = useAppColors();
   const backgroundColor = sent ? colors.accent : colors.subtle;
   const textColor = sent ? "#FFFFFF" : colors.text;
-  const metaColor = sent ? "rgba(255,255,255,0.7)" : colors.secondary;
+  const metaColor = sent ? "rgba(255,255,255,0.75)" : colors.secondary;
 
   return (
     <View
@@ -296,10 +300,26 @@ export function ChatBubble({
         { backgroundColor },
       ]}
     >
-      <Text style={[styles.chatBubbleText, { color: textColor }]}>{message}</Text>
-      {timestamp ? (
-        <Text style={[styles.chatBubbleTime, { color: metaColor }]}>{timestamp}</Text>
+      {imageUrl ? (
+        <Image
+          source={{ uri: imageUrl }}
+          style={styles.chatBubbleImage}
+          contentFit="cover"
+        />
       ) : null}
+      {message ? (
+        <Text style={[styles.chatBubbleText, { color: textColor }]}>{message}</Text>
+      ) : null}
+      <View style={styles.chatBubbleMeta}>
+        {timestamp ? (
+          <Text style={[styles.chatBubbleTime, { color: metaColor }]}>{timestamp}</Text>
+        ) : null}
+        {sent ? (
+          <Text style={[styles.chatBubbleCheck, { color: read ? "#4CD964" : metaColor }]}>
+            {read ? "✓✓" : "✓"}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -355,7 +375,10 @@ const styles = StyleSheet.create({
   chatBubbleSent: { alignSelf: "flex-end", borderBottomRightRadius: 4 },
   chatBubbleReceived: { alignSelf: "flex-start", borderBottomLeftRadius: 4 },
   chatBubbleText: { fontSize: 14, lineHeight: 20 },
-  chatBubbleTime: { fontSize: 10, alignSelf: "flex-end" },
+  chatBubbleImage: { width: 200, height: 150, borderRadius: 10, marginBottom: 4 },
+  chatBubbleMeta: { flexDirection: "row", alignItems: "center", alignSelf: "flex-end", gap: 4 },
+  chatBubbleTime: { fontSize: 10 },
+  chatBubbleCheck: { fontSize: 11, fontWeight: "700" },
   notice: { borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 9 },
   noticeText: { flex: 1, fontSize: 12, lineHeight: 18 },
   mutedText: { fontSize: 13, lineHeight: 19 },

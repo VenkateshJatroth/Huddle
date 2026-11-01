@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
   Pressable,
   ScrollView,
   Share,
@@ -11,7 +10,10 @@ import {
   View,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Image } from "expo-image";
 import { useAuth } from "../../auth/AuthProvider";
+import { FeedPostCard } from "../../components/FeedPostCard";
 import { Icon } from "../../components/Icon";
 import { SafetyActionModal } from "../../components/SafetyActionModal";
 import {
@@ -19,21 +21,26 @@ import {
   Avatar,
   Card,
   ChoiceChip,
+  SectionHeading,
   VerifiedBadge,
 } from "../../components/ui";
+import { VoiceIntroCard } from "../../components/VoiceIntroCard";
 import { fetchMemberProfile, recordLike } from "../../lib/gormati-profiles";
-import { followProfile } from "../../lib/relationships";
 import type { GormatiProfile } from "../../lib/gormati-profiles";
+import { fetchUserPosts, type PublishedPost } from "../../lib/posts";
+import { followProfile } from "../../lib/relationships";
 import { useAppColors } from "../../theme/colors";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function MemberProfileDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { user } = useAuth();
 
   const [profile, setProfile] = useState<GormatiProfile | null>(null);
+  const [memberPosts, setMemberPosts] = useState<PublishedPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
@@ -46,8 +53,14 @@ export default function MemberProfileDetailScreen() {
       if (!id) return;
       setIsLoading(true);
       try {
-        const data = await fetchMemberProfile(id);
-        if (isCurrent) setProfile(data);
+        const [profileData, postsData] = await Promise.all([
+          fetchMemberProfile(id),
+          fetchUserPosts(id),
+        ]);
+        if (isCurrent) {
+          setProfile(profileData);
+          setMemberPosts(postsData);
+        }
       } finally {
         if (isCurrent) setIsLoading(false);
       }
@@ -68,21 +81,17 @@ export default function MemberProfileDetailScreen() {
     }
   };
 
-  const handlePass = () => {
-    router.back();
-  };
-
   const handleShare = async () => {
     if (!profile) return;
     try {
       const profileUrl = `https://gormati.app/m/${profile.username || profile.id}`;
       await Share.share({
         title: `${profile.display_name}'s Profile on GorMati`,
-        message: `Check out ${profile.display_name}'s profile on GorMati:\n${profileUrl}`,
+        message: `Connect with ${profile.display_name} (@${profile.username}) on GorMati:\n${profileUrl}`,
         url: profileUrl,
       });
     } catch {
-      // User cancelled or share error
+      // User cancelled
     }
   };
 
@@ -128,8 +137,17 @@ export default function MemberProfileDetailScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      {/* Top Header Bar */}
-      <View style={[styles.navBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      {/* Top Header Bar with Safe Area Insets to prevent status bar collision */}
+      <View
+        style={[
+          styles.navBar,
+          {
+            paddingTop: Math.max(insets.top + 8, 20),
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -163,7 +181,7 @@ export default function MemberProfileDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Photo Carousel or Avatar */}
+        {/* Photo Gallery Carousel or Large Avatar */}
         {gallery.length > 0 ? (
           <View style={styles.carouselContainer}>
             <ScrollView
@@ -182,7 +200,7 @@ export default function MemberProfileDetailScreen() {
                   key={idx}
                   source={{ uri }}
                   style={[styles.carouselImage, { width: SCREEN_WIDTH }]}
-                  resizeMode="cover"
+                  contentFit="cover"
                 />
               ))}
             </ScrollView>
@@ -220,66 +238,39 @@ export default function MemberProfileDetailScreen() {
             <Text style={[styles.profileHandle, { color: colors.secondary }]}>@{profile.username}</Text>
           </View>
 
-          {/* Location & Dating Intention Pills */}
-          <View style={styles.pillRow}>
-            {profile.location ? (
-              <View style={[styles.metaPill, { backgroundColor: colors.subtle, borderColor: colors.border }]}>
-                <Icon name="location" color={colors.secondary} size={14} />
-                <Text style={[styles.metaPillText, { color: colors.text }]}>{profile.location}</Text>
-              </View>
-            ) : null}
-
-            {profile.dating_intention ? (
-              <View style={[styles.intentionPill, { backgroundColor: colors.accent }]}>
-                <Text style={styles.intentionPillText}>
-                  {profile.dating_intention}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Bio */}
           {profile.bio ? (
             <Text style={[styles.bioText, { color: colors.text }]}>{profile.bio}</Text>
           ) : null}
+
+          {/* Quick Badges: Location & Dating Intention */}
+          <View style={styles.badgesRow}>
+            {profile.location ? (
+              <View style={[styles.badgeItem, { backgroundColor: colors.subtle }]}>
+                <Icon name="location" color={colors.secondary} size={13} />
+                <Text style={[styles.badgeText, { color: colors.text }]}>{profile.location}</Text>
+              </View>
+            ) : null}
+            {profile.dating_intention ? (
+              <View style={[styles.badgeItem, { backgroundColor: colors.subtle }]}>
+                <Icon name="heart" color={colors.accent} size={13} />
+                <Text style={[styles.badgeText, { color: colors.text }]}>{profile.dating_intention}</Text>
+              </View>
+            ) : null}
+          </View>
         </Card>
 
-        {/* Compatibility Score Card */}
-        <Card style={[styles.compatCard, { backgroundColor: colors.surface }]}>
-          <View style={styles.compatHeader}>
-            <View style={[styles.compatBadge, { backgroundColor: colors.accent }]}>
-              <Icon name="sparkles" color="#FFFFFF" size={16} />
-              <Text style={styles.compatScoreText}>94% Match</Text>
-            </View>
-            <Text style={[styles.compatTitle, { color: colors.text }]}>Strong Cultural & Lifestyle Alignment</Text>
-          </View>
-          <Text style={[styles.compatDescription, { color: colors.secondary }]}>
-            You both value authentic community conversations, literature, and weekend outdoor exploration.
-          </Text>
-        </Card>
-
-        {/* Prompt Answer Cards */}
-        {prompts.length > 0 ? (
-          <View style={styles.sectionBlock}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Conversation Prompts</Text>
-            {prompts.map((prompt, idx) => (
-              <Card key={idx} style={[styles.promptCard, { backgroundColor: colors.surface }]}>
-                <Text style={[styles.promptQuestion, { color: colors.secondary }]}>
-                  {prompt.question}
-                </Text>
-                <Text style={[styles.promptAnswer, { color: colors.text }]}>
-                  {prompt.answer}
-                </Text>
-              </Card>
-            ))}
-          </View>
-        ) : null}
+        {/* 15-Second Voice Introduction */}
+        <VoiceIntroCard
+          voiceUrl={profile.voice_intro_url}
+          durationSec={profile.voice_duration_sec || 15}
+          isOwner={user?.id === profile.id}
+        />
 
         {/* Interests */}
         {interests.length > 0 ? (
-          <Card style={styles.interestsCard}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Passions & Interests</Text>
-            <View style={styles.chipsWrap}>
+          <Card style={styles.sectionCard}>
+            <Text style={[styles.sectionTitle, { color: colors.secondary }]}>Interests</Text>
+            <View style={styles.chipsRow}>
               {interests.map((interest) => (
                 <ChoiceChip key={interest} label={interest} />
               ))}
@@ -287,67 +278,63 @@ export default function MemberProfileDetailScreen() {
           </Card>
         ) : null}
 
-        {/* Gallery Grid if more than 1 image */}
-        {gallery.length > 1 ? (
-          <View style={styles.sectionBlock}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Photo Gallery</Text>
-            <View style={styles.galleryGrid}>
-              {gallery.map((uri, idx) => (
-                <Image key={idx} source={{ uri }} style={styles.gridImage} resizeMode="cover" />
-              ))}
-            </View>
+        {/* Prompts */}
+        {prompts.map((p, idx) => (
+          <Card key={idx} style={styles.promptCard}>
+            <Text style={[styles.promptQuestion, { color: colors.secondary }]}>{p.question}</Text>
+            <Text style={[styles.promptAnswer, { color: colors.text }]}>{p.answer}</Text>
+          </Card>
+        ))}
+
+        {/* Member Posts Feed */}
+        {memberPosts.length > 0 ? (
+          <View style={styles.postsSection}>
+            <SectionHeading title={`${profile.display_name.split(" ")[0]}’s Posts`} />
+            {memberPosts.map((post) => (
+              <FeedPostCard
+                key={post.id}
+                post={post}
+                currentUserId={user?.id}
+                onToggleLike={() => {}}
+                mediaSource={post.image_url ? { uri: post.image_url } : undefined}
+              />
+            ))}
           </View>
         ) : null}
 
-        {/* Extra spacing for sticky bottom bar */}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 90 }} />
       </ScrollView>
 
-      {/* Sticky Bottom Action Bar */}
-      <View style={[styles.bottomBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Pass"
-          onPress={handlePass}
-          style={({ pressed }) => [
-            styles.roundActionButton,
-            styles.passButton,
-            { borderColor: colors.border, backgroundColor: pressed ? colors.subtle : colors.surface },
-          ]}
-        >
-          <Icon name="close" color={colors.secondary} size={22} />
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Like ${profile.display_name}`}
-          onPress={() => { void handleLike(); }}
-          disabled={isLiked || isLiking}
-          style={({ pressed }) => [
-            styles.roundActionButton,
-            {
-              backgroundColor: isLiked ? colors.accentStrong : colors.accent,
-              opacity: pressed ? 0.85 : 1,
-            },
-          ]}
-        >
-          {isLiking ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Icon name="heart" color="#FFFFFF" size={22} />
-          )}
-        </Pressable>
-
-        <View style={{ flex: 1 }}>
+      {/* Floating Bottom Action Bar */}
+      <View
+        style={[
+          styles.bottomBar,
+          {
+            paddingBottom: Math.max(insets.bottom, 12),
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+          },
+        ]}
+      >
+        <View style={styles.bottomBarButton}>
           <AppButton
-            label={`Message ${profile.display_name.split(" ")[0]}`}
+            label="Message"
+            variant="outline"
             icon="chat"
             onPress={handleMessage}
           />
         </View>
+        <View style={styles.bottomBarButton}>
+          <AppButton
+            label={isLiked ? "Connected ✓" : "Connect"}
+            icon={isLiked ? "check" : "sparkles"}
+            disabled={isLiked || isLiking}
+            onPress={() => { void handleLike(); }}
+          />
+        </View>
       </View>
 
-      {profile && user ? (
+      {user ? (
         <SafetyActionModal
           visible={safetyModalVisible}
           onClose={() => setSafetyModalVisible(false)}
@@ -365,105 +352,78 @@ export default function MemberProfileDetailScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  loadingScreen: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, padding: 24 },
-  loadingText: { fontSize: 14 },
+  loadingScreen: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
+  loadingText: { fontSize: 13 },
   errorTitle: { fontSize: 18, fontWeight: "800" },
   navBar: {
-    height: 54,
+    paddingBottom: 12,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
+    gap: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backButton: { width: 36, height: 36, alignItems: "center", justifyContent: "center", transform: [{ rotate: "180deg" }] },
-  navTitle: { fontSize: 16, fontWeight: "800", flex: 1, textAlign: "center" },
-  navRight: { minWidth: 36, flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "flex-end" },
-  optionsButton: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  scrollContent: { gap: 16 },
-  carouselContainer: { width: SCREEN_WIDTH, height: 340, position: "relative" },
-  carouselImage: { height: 340, backgroundColor: "#E5E5EA" },
+  backButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    transform: [{ rotate: "180deg" }],
+  },
+  navTitle: { flex: 1, fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
+  navRight: { flexDirection: "row", alignItems: "center", gap: 6 },
+  optionsButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scrollContent: { gap: 14 },
+  carouselContainer: { width: "100%", height: 380, position: "relative" },
+  carouselImage: { height: "100%" },
   dotsRow: {
     position: "absolute",
     bottom: 12,
-    alignSelf: "center",
+    left: 0,
+    right: 0,
     flexDirection: "row",
+    justifyContent: "center",
     gap: 6,
   },
-  dot: { width: 7, height: 7, borderRadius: 3.5 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
   avatarHero: {
+    width: "100%",
     height: 220,
     alignItems: "center",
     justifyContent: "center",
     borderBottomWidth: 1,
   },
-  identityCard: { padding: 18, gap: 12, marginHorizontal: 16, marginTop: 12 },
-  nameHeader: { gap: 3 },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  profileName: { fontSize: 24, fontWeight: "800", letterSpacing: -0.4 },
-  profileHandle: { fontSize: 14 },
-  pillRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  metaPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  metaPillText: { fontSize: 12, fontWeight: "600" },
-  intentionPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  intentionPillText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
-  bioText: { fontSize: 15, lineHeight: 22, marginTop: 4 },
-  compatCard: { padding: 16, gap: 10, marginHorizontal: 16 },
-  compatHeader: { gap: 8 },
-  compatBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  compatScoreText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
-  compatTitle: { fontSize: 15, fontWeight: "800" },
-  compatDescription: { fontSize: 13, lineHeight: 19 },
-  sectionBlock: { gap: 10, marginHorizontal: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: "800" },
-  promptCard: { padding: 16, gap: 6 },
+  identityCard: { marginHorizontal: 16, marginTop: 4, gap: 10 },
+  nameHeader: { gap: 2 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  profileName: { fontSize: 22, fontWeight: "800", letterSpacing: -0.4 },
+  profileHandle: { fontSize: 13 },
+  bioText: { fontSize: 14, lineHeight: 21 },
+  badgesRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 2 },
+  badgeItem: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  badgeText: { fontSize: 12, fontWeight: "600" },
+  sectionCard: { marginHorizontal: 16, gap: 8 },
+  sectionTitle: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  promptCard: { marginHorizontal: 16, gap: 6 },
   promptQuestion: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
-  promptAnswer: { fontSize: 15, fontWeight: "600", lineHeight: 22 },
-  interestsCard: { padding: 16, gap: 12, marginHorizontal: 16 },
-  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  galleryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  gridImage: { width: (SCREEN_WIDTH - 42) / 2, height: 160, borderRadius: 12, backgroundColor: "#E5E5EA" },
+  promptAnswer: { fontSize: 14, fontWeight: "600", lineHeight: 21 },
+  postsSection: { marginHorizontal: 16, gap: 12 },
   bottomBar: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: 12,
+    gap: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  roundActionButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  passButton: {
-    borderWidth: 1.5,
-  },
+  bottomBarButton: { flex: 1 },
 });
-

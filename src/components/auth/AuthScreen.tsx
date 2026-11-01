@@ -14,28 +14,39 @@ import { supabase } from "../../lib/supabase";
 import { useAppColors } from "../../theme/colors";
 
 type AuthMode = "sign-in" | "sign-up";
-type AuthMethod = "password" | "phone" | "magic-link";
+type AuthMethod = "email" | "phone";
 type Feedback = { kind: "error" | "success"; message: string } | null;
+
+const COUNTRY_CODES = [
+  { code: "+91", label: "+91 IN", country: "India" },
+  { code: "+971", label: "+971 AE", country: "UAE" },
+  { code: "+974", label: "+974 QA", country: "Qatar" },
+  { code: "+1", label: "+1 US", country: "USA" },
+  { code: "+44", label: "+44 UK", country: "UK" },
+  { code: "custom", label: "Custom +", country: "Other" },
+];
 
 export function AuthScreen({ mode }: { mode: AuthMode }) {
   const colors = useAppColors();
   const isSignUp = mode === "sign-up";
 
-  const [authMethod, setAuthMethod] = useState<AuthMethod>("password");
+  const [authMethod, setAuthMethod] = useState<AuthMethod>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Phone OTP state
-  const [phone, setPhone] = useState("");
+  // Global Phone Authentication state
+  const [selectedCountryCode, setSelectedCountryCode] = useState("+91");
+  const [customCountryCode, setCustomCountryCode] = useState("+");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [otpToken, setOtpToken] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
-  // 1. Password submit
-  async function submitPassword() {
+  // 1. Email & Password Submit
+  async function submitEmail() {
     if (isSubmitting) return;
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -76,23 +87,33 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     }
   }
 
+  // Helper: Build E.164 phone number
+  function getFullPhoneNumber(): string {
+    const rawNumber = phoneNumber.replace(/\D/g, "");
+    if (selectedCountryCode === "custom") {
+      const code = customCountryCode.startsWith("+") ? customCountryCode : `+${customCountryCode}`;
+      return `${code}${rawNumber}`;
+    }
+    return `${selectedCountryCode}${rawNumber}`;
+  }
+
   // 2. Phone OTP Send
   async function submitPhoneSend() {
-    const raw = phone.trim();
-    if (!raw || raw.length < 10) {
-      setFeedback({ kind: "error", message: "Enter a valid mobile phone number including country code (e.g. +91 9876543210)." });
+    const raw = phoneNumber.trim().replace(/\D/g, "");
+    if (!raw || raw.length < 7) {
+      setFeedback({ kind: "error", message: "Enter a valid phone number (at least 7 digits)." });
       return;
     }
 
-    const formatted = raw.startsWith("+") ? raw : `+91${raw.replace(/\D/g, "")}`;
+    const fullPhone = getFullPhoneNumber();
     setFeedback(null);
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: formatted });
+      const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
       if (error) throw error;
       setIsOtpSent(true);
-      setFeedback({ kind: "success", message: `Verification code sent via SMS to ${formatted}.` });
+      setFeedback({ kind: "success", message: `Verification code sent via SMS to ${fullPhone}.` });
     } catch (error) {
       setFeedback({ kind: "error", message: getAuthErrorMessage(error, isSignUp) });
     } finally {
@@ -104,19 +125,17 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
   async function submitPhoneVerify() {
     const code = otpToken.trim();
     if (!code || code.length < 6) {
-      setFeedback({ kind: "error", message: "Enter the 6-digit code received on your phone." });
+      setFeedback({ kind: "error", message: "Enter the 6-digit verification code sent to your phone." });
       return;
     }
 
-    const raw = phone.trim();
-    const formatted = raw.startsWith("+") ? raw : `+91${raw.replace(/\D/g, "")}`;
-
+    const fullPhone = getFullPhoneNumber();
     setFeedback(null);
     setIsSubmitting(true);
 
     try {
       const { error } = await supabase.auth.verifyOtp({
-        phone: formatted,
+        phone: fullPhone,
         token: code,
         type: "sms",
       });
@@ -128,51 +147,20 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     }
   }
 
-  // 4. Magic Link Send
-  async function submitMagicLink() {
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      setFeedback({ kind: "error", message: "Enter a valid email address to receive your magic link." });
-      return;
-    }
-
-    setFeedback(null);
-    setIsSubmitting(true);
-
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: normalizedEmail,
-        options: {
-          emailRedirectTo: "gormati://auth/callback",
-        },
-      });
-      if (error) throw error;
-      setFeedback({
-        kind: "success",
-        message: "We sent a sign-in magic link to your email. Tap the link on your phone to open GorMati.",
-      });
-    } catch (error) {
-      setFeedback({ kind: "error", message: getAuthErrorMessage(error, isSignUp) });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  // 5. Social OAuth
-  async function handleSocialSignIn(provider: "google" | "apple") {
+  // 4. Continue with Google
+  async function handleGoogleSignIn() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider,
+        provider: "google",
         options: {
           redirectTo: "gormati://auth/callback",
         },
       });
       if (error) throw error;
     } catch {
-      const name = provider === "google" ? "Google" : "Apple";
       Alert.alert(
-        `${name} Sign-In`,
-        `Direct ${name} OAuth is connecting to your configured Supabase project. If not yet enabled in the Supabase console, use Email or SMS login.`,
+        "Google Sign-In",
+        "Google OAuth connects directly to your Supabase project. If not yet activated in your Supabase dashboard, use Email or Mobile Number to sign in.",
       );
     }
   }
@@ -193,74 +181,54 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
 
       <PageHeading
         title={title}
-        subtitle={isSignUp ? "Join communities across India, in every language and interest." : "Sign in to continue to your community."}
+        subtitle={isSignUp ? "Join communities across India and globally, in every language and interest." : "Sign in to continue to your community."}
         eyebrow={isSignUp ? "Join GorMati" : "Good to see you"}
       />
 
-      {/* Social OAuth Sign In Buttons */}
-      <View style={styles.socialButtonsGroup}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Continue with Google"
-          onPress={() => { void handleSocialSignIn("google"); }}
-          style={[styles.socialButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
-          <Text style={[styles.socialIconText, { color: colors.text }]}>G</Text>
-          <Text style={[styles.socialButtonText, { color: colors.text }]}>Continue with Google</Text>
-        </Pressable>
+      {/* Primary Social Option: Continue with Google */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Continue with Google"
+        onPress={() => { void handleGoogleSignIn(); }}
+        style={[styles.googleButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <Text style={[styles.googleIconText, { color: colors.text }]}>G</Text>
+        <Text style={[styles.googleButtonText, { color: colors.text }]}>Continue with Google</Text>
+      </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Continue with Apple"
-          onPress={() => { void handleSocialSignIn("apple"); }}
-          style={[styles.socialButton, { backgroundColor: colors.accent, borderColor: colors.accent }]}
-        >
-          <Text style={[styles.socialIconText, { color: "#FFFFFF" }]}></Text>
-          <Text style={[styles.socialButtonText, { color: "#FFFFFF" }]}>Continue with Apple</Text>
-        </Pressable>
-      </View>
-
-      {/* Or Divider */}
+      {/* Divider */}
       <View style={styles.dividerRow}>
         <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-        <Text style={[styles.dividerText, { color: colors.secondary }]}>OR CONTINUE WITH</Text>
+        <Text style={[styles.dividerText, { color: colors.secondary }]}>OR USE</Text>
         <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
       </View>
 
-      {/* Method Switcher Tabs */}
+      {/* 2 Focused Sign-in Tabs: Email vs Mobile Number */}
       <View style={styles.methodTabs}>
         <ChoiceChip
-          label="Password"
-          selected={authMethod === "password"}
+          label="Email & Password"
+          selected={authMethod === "email"}
           onPress={() => {
-            setAuthMethod("password");
+            setAuthMethod("email");
             setFeedback(null);
           }}
         />
         <ChoiceChip
-          label="Phone (SMS)"
+          label="Mobile Number (SMS)"
           selected={authMethod === "phone"}
           onPress={() => {
             setAuthMethod("phone");
             setFeedback(null);
           }}
         />
-        <ChoiceChip
-          label="Magic Link"
-          selected={authMethod === "magic-link"}
-          onPress={() => {
-            setAuthMethod("magic-link");
-            setFeedback(null);
-          }}
-        />
       </View>
 
       <Card style={styles.formCard}>
-        {/* --- 1. Password Form --- */}
-        {authMethod === "password" ? (
+        {/* --- 1. Email Form --- */}
+        {authMethod === "email" ? (
           <>
             <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.text }]}>Email</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Email Address</Text>
               <TextInput
                 accessibilityLabel="Email address"
                 value={email}
@@ -291,7 +259,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                 secureTextEntry
                 returnKeyType={isSignUp ? "next" : "go"}
                 textContentType={isSignUp ? "newPassword" : "password"}
-                onSubmitEditing={() => { if (!isSignUp) void submitPassword(); }}
+                onSubmitEditing={() => { if (!isSignUp) void submitEmail(); }}
                 editable={!isSubmitting}
                 style={[styles.input, { color: colors.text, backgroundColor: colors.subtle, borderColor: colors.border }]}
               />
@@ -299,7 +267,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
 
             {isSignUp ? (
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.text }]}>Confirm password</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Confirm Password</Text>
                 <TextInput
                   accessibilityLabel="Confirm password"
                   value={confirmPassword}
@@ -311,7 +279,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                   secureTextEntry
                   returnKeyType="go"
                   textContentType="newPassword"
-                  onSubmitEditing={() => { void submitPassword(); }}
+                  onSubmitEditing={() => { void submitEmail(); }}
                   editable={!isSubmitting}
                   style={[styles.input, { color: colors.text, backgroundColor: colors.subtle, borderColor: colors.border }]}
                 />
@@ -321,26 +289,60 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
             <AppButton
               label={isSubmitting ? (isSignUp ? "Creating account…" : "Signing in…") : (isSignUp ? "Create account" : "Sign in")}
               disabled={isSubmitting}
-              onPress={() => { void submitPassword(); }}
+              onPress={() => { void submitEmail(); }}
             />
           </>
         ) : null}
 
-        {/* --- 2. Phone SMS Form --- */}
+        {/* --- 2. Global Mobile Number Form with Country Code Selector --- */}
         {authMethod === "phone" ? (
           <>
             <View style={styles.field}>
+              <Text style={[styles.label, { color: colors.text }]}>Select Country Dial Code</Text>
+              <View style={styles.countryCodesRow}>
+                {COUNTRY_CODES.map((c) => (
+                  <ChoiceChip
+                    key={c.code}
+                    label={c.label}
+                    selected={selectedCountryCode === c.code}
+                    onPress={() => setSelectedCountryCode(c.code)}
+                  />
+                ))}
+              </View>
+            </View>
+
+            {selectedCountryCode === "custom" ? (
+              <View style={styles.field}>
+                <Text style={[styles.label, { color: colors.text }]}>Custom Dial Code</Text>
+                <TextInput
+                  accessibilityLabel="Custom Country Dial Code"
+                  value={customCountryCode}
+                  onChangeText={setCustomCountryCode}
+                  placeholder="+XX"
+                  placeholderTextColor={colors.secondary}
+                  keyboardType="phone-pad"
+                  style={[styles.input, { color: colors.text, backgroundColor: colors.subtle, borderColor: colors.border }]}
+                />
+              </View>
+            ) : null}
+
+            <View style={styles.field}>
               <Text style={[styles.label, { color: colors.text }]}>Mobile Phone Number</Text>
-              <TextInput
-                accessibilityLabel="Mobile phone number"
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="+91 98765 43210"
-                placeholderTextColor={colors.secondary}
-                keyboardType="phone-pad"
-                editable={!isSubmitting && !isOtpSent}
-                style={[styles.input, { color: colors.text, backgroundColor: colors.subtle, borderColor: colors.border }]}
-              />
+              <View style={[styles.phoneInputRow, { backgroundColor: colors.subtle, borderColor: colors.border }]}>
+                <Text style={[styles.phoneCodePrefix, { color: colors.secondary }]}>
+                  {selectedCountryCode === "custom" ? customCountryCode : selectedCountryCode}
+                </Text>
+                <TextInput
+                  accessibilityLabel="Phone number"
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  placeholder="98765 43210"
+                  placeholderTextColor={colors.secondary}
+                  keyboardType="phone-pad"
+                  editable={!isSubmitting && !isOtpSent}
+                  style={[styles.phoneInputField, { color: colors.text }]}
+                />
+              </View>
             </View>
 
             {isOtpSent ? (
@@ -380,37 +382,10 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
             ) : (
               <AppButton
                 label={isSubmitting ? "Sending SMS…" : "Send Verification Code"}
-                disabled={isSubmitting || !phone.trim()}
+                disabled={isSubmitting || !phoneNumber.trim()}
                 onPress={() => { void submitPhoneSend(); }}
               />
             )}
-          </>
-        ) : null}
-
-        {/* --- 3. Magic Link Form --- */}
-        {authMethod === "magic-link" ? (
-          <>
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.text }]}>Email</Text>
-              <TextInput
-                accessibilityLabel="Email address"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                placeholderTextColor={colors.secondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                editable={!isSubmitting}
-                style={[styles.input, { color: colors.text, backgroundColor: colors.subtle, borderColor: colors.border }]}
-              />
-            </View>
-
-            <AppButton
-              label={isSubmitting ? "Sending Link…" : "Send Magic Link"}
-              disabled={isSubmitting || !email.trim()}
-              onPress={() => { void submitMagicLink(); }}
-            />
           </>
         ) : null}
 
@@ -481,8 +456,7 @@ const styles = StyleSheet.create({
   brandText: { flex: 1, gap: 2 },
   brandName: { fontSize: 20, fontWeight: "800", letterSpacing: -0.4 },
   brandSubtitle: { fontSize: 12 },
-  socialButtonsGroup: { gap: 10, marginTop: 4 },
-  socialButton: {
+  googleButton: {
     height: 48,
     borderRadius: 14,
     borderWidth: 1,
@@ -491,15 +465,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
     paddingHorizontal: 16,
+    marginTop: 6,
   },
-  socialIconText: { fontSize: 18, fontWeight: "800" },
-  socialButtonText: { fontSize: 14, fontWeight: "700" },
-  dividerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 6 },
+  googleIconText: { fontSize: 18, fontWeight: "800" },
+  googleButtonText: { fontSize: 14, fontWeight: "700" },
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 8 },
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth },
   dividerText: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
   methodTabs: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   formCard: { gap: 16 },
   field: { gap: 7 },
+  countryCodesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  phoneInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    minHeight: 48,
+    gap: 8,
+  },
+  phoneCodePrefix: { fontSize: 14, fontWeight: "700" },
+  phoneInputField: { flex: 1, fontSize: 14, paddingVertical: 10 },
   label: { fontSize: 14, fontWeight: "700" },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, fontSize: 14 },
   feedback: { borderWidth: 1, borderRadius: 12, padding: 12 },

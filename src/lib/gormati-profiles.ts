@@ -14,7 +14,10 @@ import { supabase } from "./supabase";
 // Types
 // ---------------------------------------------------------------------------
 
-export type GormatiProfile = Database["public"]["Tables"]["profiles"]["Row"];
+export type GormatiProfile = Database["public"]["Tables"]["profiles"]["Row"] & {
+  voice_intro_url?: string | null;
+  voice_duration_sec?: number | null;
+};
 
 /**
  * Fields the user can update on their own profile.
@@ -32,6 +35,8 @@ export type GormatiProfileDraft = {
   interests: string[];
   prompts: { question: string; answer: string }[];
   gallery_urls?: string[];
+  voice_intro_url?: string | null;
+  voice_duration_sec?: number | null;
 };
 
 /** Subset of profile data returned for discover/browse cards. */
@@ -246,6 +251,8 @@ export async function updateGormatiProfile(
   if (draft.prompts !== undefined) update.prompts = draft.prompts;
   if (draft.avatar_url !== undefined) update.avatar_url = draft.avatar_url;
   if (draft.gallery_urls !== undefined) update.gallery_urls = draft.gallery_urls;
+  if (draft.voice_intro_url !== undefined) (update as any).voice_intro_url = draft.voice_intro_url;
+  if (draft.voice_duration_sec !== undefined) (update as any).voice_duration_sec = draft.voice_duration_sec;
 
   const { data, error } = await supabase
     .from("profiles")

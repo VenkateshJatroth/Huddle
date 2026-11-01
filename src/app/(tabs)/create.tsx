@@ -19,7 +19,12 @@ import {
   ChoiceChip,
   PageHeading,
 } from "../../components/ui";
-import { createPost, type PostAudience } from "../../lib/posts";
+import {
+  COMMUNITY_CHANNELS,
+  createPost,
+  type CommunityChannel,
+  type PostAudience,
+} from "../../lib/posts";
 import { useAppColors } from "../../theme/colors";
 
 const audiences = ["Everyone", "Connections", "Only me"] as const;
@@ -30,6 +35,7 @@ export default function CreateScreen() {
 
   const [draft, setDraft] = useState("");
   const [audience, setAudience] = useState<PostAudience>("Everyone");
+  const [channel, setChannel] = useState<CommunityChannel>("General");
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -78,6 +84,7 @@ export default function CreateScreen() {
         username,
         text,
         audience,
+        channel,
         localImageUri: selectedImageUri,
       });
 
@@ -163,6 +170,24 @@ export default function CreateScreen() {
           </View>
         ) : null}
       </Card>
+
+      {/* Community Circle / Topic Channel Selection */}
+      <View style={styles.audienceBlock}>
+        <Text style={[styles.fieldLabel, { color: colors.text }]}>Community Circle</Text>
+        <Text style={[styles.helperText, { color: colors.secondary }]}>
+          Tag your conversation with a circle so relevant members can discover it.
+        </Text>
+        <View style={styles.audienceChoices}>
+          {COMMUNITY_CHANNELS.map((ch) => (
+            <ChoiceChip
+              key={ch}
+              label={`# ${ch}`}
+              selected={channel === ch}
+              onPress={() => setChannel(ch)}
+            />
+          ))}
+        </View>
+      </View>
 
       {/* Audience Scope Selection */}
       <View style={styles.audienceBlock}>

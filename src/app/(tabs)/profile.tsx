@@ -30,6 +30,7 @@ import { useAuth } from "../../auth/AuthProvider";
 import { DemoAvatar } from "../../components/DemoAvatar";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import { Icon } from "../../components/Icon";
+import { VoiceIntroCard } from "../../components/VoiceIntroCard";
 import {
   AppScreen,
   AppButton,
@@ -594,6 +595,16 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
               />
             </View>
           </Card>
+
+          {/* 15-Second Voice Introduction */}
+          <VoiceIntroCard
+            voiceUrl={profile.voice_intro_url}
+            durationSec={profile.voice_duration_sec || 15}
+            isOwner
+            onRecordNew={() => {
+              Alert.alert("Voice Intro Saved", "Your 15-second voice introduction is saved to your profile.");
+            }}
+          />
 
           {relationshipCountState === "ready" && relationshipCounts ? (
             <Card style={styles.connectionStats}>

@@ -201,6 +201,14 @@ export function FeedPostCard({
         <Text style={[styles.contextText, { color: colors.secondary }]}>{post.location}</Text>
         <View style={[styles.dot, { backgroundColor: colors.secondary }]} />
         <Text style={[styles.contextText, { color: colors.secondary }]}>{post.language}</Text>
+        {publishedPost.channel ? (
+          <>
+            <View style={[styles.dot, { backgroundColor: colors.secondary }]} />
+            <Text style={[styles.contextText, { color: colors.text, fontWeight: "700" }]}>
+              #{publishedPost.channel}
+            </Text>
+          </>
+        ) : null}
         {publishedPost.audience && publishedPost.audience !== "Everyone" ? (
           <>
             <View style={[styles.dot, { backgroundColor: colors.secondary }]} />

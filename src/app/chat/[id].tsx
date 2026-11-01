@@ -12,6 +12,9 @@ import {
   View,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../../auth/AuthProvider";
 import { Icon } from "../../components/Icon";
 import { SafetyActionModal } from "../../components/SafetyActionModal";
@@ -24,8 +27,10 @@ import {
 import {
   DATE_PROMPTS,
   fetchConversationMessages,
+  markMessagesAsRead,
   sendChatMessage,
   subscribeToMessages,
+  subscribeToTypingIndicator,
 } from "../../lib/gormati-chat";
 import type { ChatMessage } from "../../lib/gormati-chat";
 import { fetchMemberProfile } from "../../lib/gormati-profiles";
@@ -34,6 +39,7 @@ import { useAppColors } from "../../theme/colors";
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { user } = useAuth();
 
@@ -42,9 +48,13 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
+  const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const [safetyModalVisible, setSafetyModalVisible] = useState(false);
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sendTypingRef = useRef<((isTyping: boolean) => void) | null>(null);
 
   // Load member details & initial messages
   useEffect(() => {
@@ -61,6 +71,9 @@ export default function ChatScreen() {
         if (!isCurrent) return;
         setMember(profileData);
         setMessages(messageHistory);
+
+        // Mark incoming messages as read
+        void markMessagesAsRead(user.id, id);
       } finally {
         if (isCurrent) setIsLoading(false);
       }
@@ -70,31 +83,96 @@ export default function ChatScreen() {
     return () => { isCurrent = false; };
   }, [id, user]);
 
-  // Realtime message subscription
+  // Realtime message subscription + live updates
   useEffect(() => {
     if (!id || !user) return;
 
-    const unsubscribe = subscribeToMessages(user.id, id, (incoming) => {
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === incoming.id)) return prev;
-        return [...prev, incoming];
-      });
-    });
+    const unsubscribe = subscribeToMessages(
+      user.id,
+      id,
+      (incoming) => {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === incoming.id)) return prev;
+          return [...prev, incoming];
+        });
+        // Mark as read if sent by partner
+        if (incoming.sender_id === id) {
+          void markMessagesAsRead(user.id, id);
+        }
+      },
+      (updated) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === updated.id ? { ...m, read_at: updated.read_at } : m)),
+        );
+      },
+    );
 
     return () => {
       unsubscribe();
     };
   }, [id, user]);
 
+  // Realtime typing indicator
+  useEffect(() => {
+    if (!id || !user) return;
+
+    const { sendTyping, unsubscribe } = subscribeToTypingIndicator(
+      user.id,
+      id,
+      (typing) => {
+        setIsPartnerTyping(typing);
+      },
+    );
+
+    sendTypingRef.current = sendTyping;
+
+    return () => {
+      unsubscribe();
+    };
+  }, [id, user]);
+
+  const handleInputChange = (text: string) => {
+    setInputText(text);
+
+    if (sendTypingRef.current) {
+      sendTypingRef.current(true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        sendTypingRef.current?.(false);
+      }, 2500);
+    }
+  };
+
+  const handlePickPhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setSelectedPhotoUri(result.assets[0].uri);
+    }
+  };
+
   const handleSend = useCallback(async (contentToSend?: string) => {
     const text = (contentToSend ?? inputText).trim();
-    if (!text || !id || !user || isSending) return;
+    const photoToSend = selectedPhotoUri;
+    if ((!text && !photoToSend) || !id || !user || isSending) return;
 
     setInputText("");
+    setSelectedPhotoUri(null);
     setIsSending(true);
 
+    if (sendTypingRef.current) {
+      sendTypingRef.current(false);
+    }
+
     try {
-      const sent = await sendChatMessage(user.id, id, text);
+      const sent = await sendChatMessage(user.id, id, text || "Sent a photo", photoToSend);
       setMessages((prev) => [...prev, sent]);
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -102,7 +180,7 @@ export default function ChatScreen() {
     } finally {
       setIsSending(false);
     }
-  }, [id, inputText, isSending, user]);
+  }, [id, inputText, isSending, selectedPhotoUri, user]);
 
   const handleDatePromptTap = (prompt: string) => {
     setInputText(prompt);
@@ -117,8 +195,17 @@ export default function ChatScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       style={[styles.screen, { backgroundColor: colors.background }]}
     >
-      {/* Top Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      {/* Top Header with Safe Area Insets to prevent status bar collision */}
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: Math.max(insets.top + 8, 20),
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
@@ -152,8 +239,15 @@ export default function ChatScreen() {
               {member?.is_verified ? <VerifiedBadge /> : null}
             </View>
             <View style={styles.statusRow}>
-              <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
-              <Text style={[styles.statusText, { color: colors.secondary }]}>Active now</Text>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: isPartnerTyping ? colors.accent : colors.success },
+                ]}
+              />
+              <Text style={[styles.statusText, { color: isPartnerTyping ? colors.accent : colors.secondary }]}>
+                {isPartnerTyping ? "Typing…" : "Active now"}
+              </Text>
             </View>
           </View>
         </Pressable>
@@ -196,11 +290,39 @@ export default function ChatScreen() {
                 message={item.content}
                 sent={isMe}
                 timestamp={item.created_at}
+                imageUrl={item.image_url}
+                read={Boolean(item.read_at)}
               />
             );
           }}
         />
       )}
+
+      {/* Live Typing Status Pill above composer */}
+      {isPartnerTyping ? (
+        <View style={[styles.typingBar, { backgroundColor: colors.subtle }]}>
+          <Text style={[styles.typingText, { color: colors.secondary }]}>
+            {memberName} is typing…
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Selected Photo Attachment Preview */}
+      {selectedPhotoUri ? (
+        <View style={[styles.attachmentPreview, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+          <Image source={{ uri: selectedPhotoUri }} style={styles.attachmentThumb} contentFit="cover" />
+          <Text numberOfLines={1} style={[styles.attachmentLabel, { color: colors.text }]}>Photo attached</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Remove photo"
+            onPress={() => setSelectedPhotoUri(null)}
+            hitSlop={8}
+            style={styles.attachmentRemoveBtn}
+          >
+            <Icon name="close" color={colors.accent} size={16} />
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* Date Prompts / Icebreaker Suggestions */}
       <View style={[styles.promptsContainer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
@@ -220,26 +342,45 @@ export default function ChatScreen() {
       </View>
 
       {/* Input Composer */}
-      <View style={[styles.composerBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+      <View
+        style={[
+          styles.composerBar,
+          {
+            paddingBottom: Math.max(insets.bottom, 10),
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+          },
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Attach photo"
+          onPress={() => { void handlePickPhoto(); }}
+          style={[styles.attachButton, { backgroundColor: colors.subtle }]}
+        >
+          <Icon name="photo" color={colors.text} size={18} />
+        </Pressable>
+
         <TextInput
           value={inputText}
-          onChangeText={setInputText}
+          onChangeText={handleInputChange}
           placeholder={`Message ${memberName.split(" ")[0]}…`}
           placeholderTextColor={colors.secondary}
           multiline
           maxLength={500}
           style={[styles.composerInput, { backgroundColor: colors.subtle, borderColor: colors.border, color: colors.text }]}
         />
+
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Send message"
           onPress={() => { void handleSend(); }}
-          disabled={!inputText.trim() || isSending}
+          disabled={(!inputText.trim() && !selectedPhotoUri) || isSending}
           style={({ pressed }) => [
             styles.sendButton,
             {
               backgroundColor: colors.accent,
-              opacity: !inputText.trim() || isSending ? 0.4 : pressed ? 0.8 : 1,
+              opacity: (!inputText.trim() && !selectedPhotoUri) || isSending ? 0.4 : pressed ? 0.8 : 1,
             },
           ]}
         >
@@ -270,7 +411,7 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: {
-    height: 60,
+    paddingBottom: 10,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
@@ -308,6 +449,19 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: "center", justifyContent: "center", paddingVertical: 40, paddingHorizontal: 24, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: "800" },
   emptySubtitle: { fontSize: 13, lineHeight: 18, textAlign: "center" },
+  typingBar: { paddingHorizontal: 16, paddingVertical: 6 },
+  typingText: { fontSize: 12, fontStyle: "italic" },
+  attachmentPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  attachmentThumb: { width: 44, height: 44, borderRadius: 8 },
+  attachmentLabel: { flex: 1, fontSize: 13, fontWeight: "600" },
+  attachmentRemoveBtn: { padding: 6 },
   promptsContainer: {
     paddingVertical: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -321,8 +475,15 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     paddingHorizontal: 12,
     paddingVertical: 10,
-    gap: 10,
+    gap: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  attachButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
   },
   composerInput: {
     flex: 1,
@@ -342,4 +503,3 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
-

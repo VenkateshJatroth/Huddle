@@ -4,12 +4,30 @@ import { samplePosts, type CommunityPost } from "../data/mockData";
 
 export type PostAudience = "Everyone" | "Connections" | "Only me";
 
+export type CommunityChannel =
+  | "General"
+  | "Tech & Systems"
+  | "Hyderabad"
+  | "Dubai"
+  | "Fitness"
+  | "Philosophy";
+
+export const COMMUNITY_CHANNELS: CommunityChannel[] = [
+  "General",
+  "Tech & Systems",
+  "Hyderabad",
+  "Dubai",
+  "Fitness",
+  "Philosophy",
+];
+
 export type PostDraft = {
   authorId: string;
   authorName: string;
   username: string;
   text: string;
   audience: PostAudience;
+  channel?: CommunityChannel;
   localImageUri?: string | null;
   location?: string;
 };
@@ -17,6 +35,7 @@ export type PostDraft = {
 export type PublishedPost = CommunityPost & {
   author_id?: string;
   audience?: PostAudience;
+  channel?: CommunityChannel;
   image_url?: string | null;
   created_at: string;
 };
@@ -149,6 +168,7 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
     likes: 0,
     replies: 0,
     audience: draft.audience,
+    channel: draft.channel || "General",
     image_url: remoteImageUrl,
     created_at: nowIso,
   };
@@ -166,6 +186,7 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
       username: draft.username,
       text: draft.text.trim(),
       audience: draft.audience,
+      channel: draft.channel || "General",
       image_url: remoteImageUrl,
       created_at: nowIso,
     });
@@ -343,6 +364,7 @@ export async function createPostReply(
 export async function fetchFeedPosts(
   filter: "For you" | "Following" = "For you",
   currentUserId?: string,
+  channelFilter: CommunityChannel | "All" = "All",
 ): Promise<PublishedPost[]> {
   const localPosts = getLocalStoredPosts();
   let remotePosts: PublishedPost[] = [];
@@ -368,6 +390,7 @@ export async function fetchFeedPosts(
         likes: row.likes_count ?? 0,
         replies: row.replies_count ?? 0,
         audience: row.audience,
+        channel: row.channel || "General",
         image_url: row.image_url,
         created_at: row.created_at,
       }));
@@ -381,7 +404,7 @@ export async function fetchFeedPosts(
 
   // Add local posts
   localPosts.forEach((p) => {
-    postMap.set(p.id, { ...p, time: formatTimeAgo(p.created_at) });
+    postMap.set(p.id, { ...p, channel: p.channel || "General", time: formatTimeAgo(p.created_at) });
   });
 
   // Add remote posts
@@ -400,17 +423,22 @@ export async function fetchFeedPosts(
     ...sp,
     created_at: new Date(Date.now() - 3600000).toISOString(),
     audience: "Everyone",
+    channel: (sp.id.includes("cycling") ? "Fitness" : "General") as CommunityChannel,
   }));
 
+  let merged = customPosts.concat(formattedSamplePosts);
+
   if (filter === "Following") {
-    // Filter to posts with audience Connections or user's own
-    return customPosts
-      .concat(formattedSamplePosts)
-      .filter((p) => p.id === "post-bengaluru-cycling" || p.audience === "Connections" || p.author_id === currentUserId);
+    merged = merged.filter(
+      (p) => p.id === "post-bengaluru-cycling" || p.audience === "Connections" || p.author_id === currentUserId,
+    );
   }
 
-  // "For you" feed shows custom user posts first, followed by sample posts
-  return [...customPosts, ...formattedSamplePosts];
+  if (channelFilter && channelFilter !== "All") {
+    merged = merged.filter((p) => p.channel === channelFilter);
+  }
+
+  return merged;
 }
 
 /**
@@ -440,6 +468,7 @@ export async function fetchUserPosts(userId: string): Promise<PublishedPost[]> {
         likes: row.likes_count ?? 0,
         replies: row.replies_count ?? 0,
         audience: row.audience,
+        channel: row.channel || "General",
         image_url: row.image_url,
         created_at: row.created_at,
       }));

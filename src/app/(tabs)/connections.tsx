@@ -86,8 +86,16 @@ export default function ConnectionsScreen() {
     }
   };
 
-  // Find mutual matches (users who follow each other)
-  const mutualConnections = overview?.connections.filter((c) => c.youFollow && c.followsYou) ?? [];
+  // Combine all active connections (both real and demo matches) for direct chatting
+  const activeChatMembers = [
+    ...(overview?.connections.map((c) => ({
+      id: c.profile.id,
+      name: c.profile.display_name,
+      avatar_url: c.profile.avatar_url,
+    })) ?? []),
+    ...sampleMatches.map((m) => ({ id: m.id, name: m.name, avatar_url: null })),
+  ];
+  const uniqueChatMembers = Array.from(new Map(activeChatMembers.map((m) => [m.id, m])).values());
 
   return (
     <AppScreen
@@ -110,37 +118,29 @@ export default function ConnectionsScreen() {
       <View style={styles.section}>
         <SectionHeading title="Matches & Active Chats" />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.matchesScroll}>
-          {mutualConnections.length > 0 ? (
-            mutualConnections.map(({ profile }) => (
-              <Pressable
-                key={profile.id}
-                onPress={() => router.push(("/chat/" + profile.id) as never)}
-                style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <View style={styles.matchAvatarWrap}>
-                  <Avatar name={profile.display_name} tone={1} size={54} imageSource={profile.avatar_url ? { uri: profile.avatar_url } : undefined} />
-                  <View style={[styles.activeDot, { backgroundColor: colors.success }]} />
-                </View>
-                <Text numberOfLines={1} style={[styles.matchName, { color: colors.text }]}>{profile.display_name}</Text>
-                <Text numberOfLines={1} style={[styles.matchActionText, { color: colors.accent }]}>Chat</Text>
-              </Pressable>
-            ))
-          ) : (
-            sampleMatches.map((match) => (
-              <Pressable
-                key={match.id}
-                onPress={() => router.push(("/chat/" + match.id) as never)}
-                style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <View style={styles.matchAvatarWrap}>
-                  <Avatar name={match.name} tone={2} size={54} />
-                  <View style={[styles.activeDot, { backgroundColor: colors.success }]} />
-                </View>
-                <Text numberOfLines={1} style={[styles.matchName, { color: colors.text }]}>{match.name}</Text>
-                <Text numberOfLines={1} style={[styles.matchActionText, { color: colors.accent }]}>Chat</Text>
-              </Pressable>
-            ))
-          )}
+          {uniqueChatMembers.map((match) => (
+            <Pressable
+              key={match.id}
+              onPress={() => router.push(("/chat/" + match.id) as never)}
+              style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            >
+              <View style={styles.matchAvatarWrap}>
+                <Avatar
+                  name={match.name}
+                  tone={match.name.length % 5}
+                  size={54}
+                  imageSource={match.avatar_url ? { uri: match.avatar_url } : undefined}
+                />
+                <View style={[styles.activeDot, { backgroundColor: colors.success }]} />
+              </View>
+              <Text numberOfLines={1} style={[styles.matchName, { color: colors.text }]}>
+                {match.name}
+              </Text>
+              <Text numberOfLines={1} style={[styles.matchActionText, { color: colors.accent }]}>
+                Chat
+              </Text>
+            </Pressable>
+          ))}
         </ScrollView>
       </View>
 

@@ -1,18 +1,21 @@
 /**
- * Real-time chat & date prompt services for Gormati.
+ * Real-time chat & date prompt services for Gormati v1.2.0.
  *
- * Supports live Supabase messages with Realtime channel subscription,
- * with graceful fallback to local / demo state if the messages table
- * has not been provisioned in the backend.
+ * Persists messages in `public.direct_messages`, supports Supabase Realtime
+ * for instant message delivery, live typing indicators, read receipts,
+ * and photo messaging.
  */
 
 import { supabase } from "./supabase";
+import { uploadProfileImage } from "./gormati-profiles";
 
 export type ChatMessage = {
   id: string;
   sender_id: string;
   receiver_id: string;
   content: string;
+  image_url?: string | null;
+  read_at?: string | null;
   created_at: string;
 };
 
@@ -24,7 +27,7 @@ export const DATE_PROMPTS = [
   "📚 What book changed your perspective?",
 ];
 
-// Fallback demo message history when database table is unavailable or empty
+// Fallback demo message history for demo users (e.g. Sana, Dev, Priya)
 const demoMessageThreads: Record<string, ChatMessage[]> = {
   "account-sana": [
     {
@@ -32,6 +35,7 @@ const demoMessageThreads: Record<string, ChatMessage[]> = {
       sender_id: "account-sana",
       receiver_id: "me",
       content: "Hey there! Loved your take on exploring old neighborhoods. Any favorite spot in mind?",
+      read_at: new Date().toISOString(),
       created_at: "10:14 AM",
     },
     {
@@ -39,6 +43,7 @@ const demoMessageThreads: Record<string, ChatMessage[]> = {
       sender_id: "me",
       receiver_id: "account-sana",
       content: "Hi Sana! Absolutely, there are some beautiful quiet lanes near the heritage center.",
+      read_at: new Date().toISOString(),
       created_at: "10:18 AM",
     },
   ],
@@ -48,6 +53,7 @@ const demoMessageThreads: Record<string, ChatMessage[]> = {
       sender_id: "account-dev",
       receiver_id: "me",
       content: "Hey! Saw you're into tech and weekend cycling. We have a ride planned this Sunday!",
+      read_at: new Date().toISOString(),
       created_at: "Yesterday",
     },
   ],
@@ -57,10 +63,21 @@ const demoMessageThreads: Record<string, ChatMessage[]> = {
       sender_id: "account-priya",
       receiver_id: "me",
       content: "Hi! Always great to connect with fellow book lovers. What are you reading right now?",
+      read_at: new Date().toISOString(),
       created_at: "2 days ago",
     },
   ],
 };
+
+function formatMessageTime(dateString: string): string {
+  try {
+    const d = new Date(dateString);
+    if (Number.isNaN(d.getTime())) return dateString;
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return dateString;
+  }
+}
 
 /**
  * Fetches 1-on-1 messages between the authenticated user and another member.
@@ -70,8 +87,8 @@ export async function fetchConversationMessages(
   otherUserId: string,
 ): Promise<ChatMessage[]> {
   try {
-    const { data, error } = await supabase
-      .from("messages" as unknown as "profiles")
+    const { data, error } = await (supabase as any)
+      .from("direct_messages")
       .select("*")
       .or(
         `and(sender_id.eq.${userId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userId})`,
@@ -82,15 +99,14 @@ export async function fetchConversationMessages(
       return demoMessageThreads[otherUserId] ?? [];
     }
 
-    return (data as unknown as ChatMessage[]).map((msg) => ({
+    return (data as any[]).map((msg) => ({
       id: msg.id,
       sender_id: msg.sender_id,
       receiver_id: msg.receiver_id,
       content: msg.content,
-      created_at: new Date(msg.created_at).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      image_url: msg.image_url,
+      read_at: msg.read_at,
+      created_at: formatMessageTime(msg.created_at),
     }));
   } catch {
     return demoMessageThreads[otherUserId] ?? [];
@@ -104,64 +120,90 @@ export async function sendChatMessage(
   senderId: string,
   receiverId: string,
   content: string,
+  localPhotoUri?: string | null,
 ): Promise<ChatMessage> {
-  const newMsg: ChatMessage = {
+  let imageUrl: string | null = null;
+
+  if (localPhotoUri) {
+    try {
+      imageUrl = await uploadProfileImage(senderId, localPhotoUri, "gallery");
+    } catch {
+      imageUrl = localPhotoUri;
+    }
+  }
+
+  const nowIso = new Date().toISOString();
+  const fallbackMsg: ChatMessage = {
     id: `msg-${Date.now()}`,
     sender_id: senderId,
     receiver_id: receiverId,
     content: content.trim(),
-    created_at: new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    image_url: imageUrl,
+    read_at: null,
+    created_at: formatMessageTime(nowIso),
   };
 
   try {
-    const { data, error } = await supabase
-      .from("messages" as unknown as "profiles")
+    const { data, error } = await (supabase as any)
+      .from("direct_messages")
       .insert({
         sender_id: senderId,
         receiver_id: receiverId,
         content: content.trim(),
-      } as unknown as { id: string; username: string })
+        image_url: imageUrl,
+      })
       .select("*")
       .maybeSingle();
 
     if (!error && data) {
-      const row = data as unknown as ChatMessage;
       return {
-        id: row.id,
-        sender_id: row.sender_id,
-        receiver_id: row.receiver_id,
-        content: row.content,
-        created_at: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        id: data.id,
+        sender_id: data.sender_id,
+        receiver_id: data.receiver_id,
+        content: data.content,
+        image_url: data.image_url,
+        read_at: data.read_at,
+        created_at: formatMessageTime(data.created_at),
       };
     }
   } catch {
-    // If backend table is not present, use the locally generated message
+    // Fallback to local
   }
 
-  // Fallback to local message delivery
   if (!demoMessageThreads[receiverId]) {
     demoMessageThreads[receiverId] = [];
   }
-  demoMessageThreads[receiverId].push(newMsg);
+  demoMessageThreads[receiverId].push(fallbackMsg);
 
-  return newMsg;
+  return fallbackMsg;
 }
 
 /**
- * Subscribes to new incoming messages via Supabase Realtime channel.
+ * Marks messages received by current user from partner as read.
+ */
+export async function markMessagesAsRead(userId: string, partnerId: string): Promise<void> {
+  try {
+    await (supabase as any)
+      .from("direct_messages")
+      .update({ read_at: new Date().toISOString() })
+      .eq("sender_id", partnerId)
+      .eq("receiver_id", userId)
+      .is("read_at", null);
+  } catch {
+    // Non-blocking
+  }
+}
+
+/**
+ * Subscribes to live incoming messages and read receipts via Supabase Realtime.
  */
 export function subscribeToMessages(
   userId: string,
   otherUserId: string,
   onNewMessage: (msg: ChatMessage) => void,
+  onMessageUpdated?: (msg: ChatMessage) => void,
 ): () => void {
-  const channelName = `chat_${[userId, otherUserId].sort().join("_")}`;
+  const channelName = `dm_${[userId, otherUserId].sort().join("_")}`;
 
   const channel = supabase
     .channel(channelName)
@@ -170,24 +212,50 @@ export function subscribeToMessages(
       {
         event: "INSERT",
         schema: "public",
-        table: "messages",
+        table: "direct_messages",
       },
       (payload) => {
-        const newRecord = payload.new as ChatMessage;
+        const row = payload.new as any;
         if (
-          (newRecord.sender_id === otherUserId && newRecord.receiver_id === userId) ||
-          (newRecord.sender_id === userId && newRecord.receiver_id === otherUserId)
+          (row.sender_id === otherUserId && row.receiver_id === userId) ||
+          (row.sender_id === userId && row.receiver_id === otherUserId)
         ) {
           onNewMessage({
-            id: newRecord.id,
-            sender_id: newRecord.sender_id,
-            receiver_id: newRecord.receiver_id,
-            content: newRecord.content,
-            created_at: new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
+            id: row.id,
+            sender_id: row.sender_id,
+            receiver_id: row.receiver_id,
+            content: row.content,
+            image_url: row.image_url,
+            read_at: row.read_at,
+            created_at: formatMessageTime(row.created_at),
           });
+        }
+      },
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "direct_messages",
+      },
+      (payload) => {
+        const row = payload.new as any;
+        if (
+          (row.sender_id === otherUserId && row.receiver_id === userId) ||
+          (row.sender_id === userId && row.receiver_id === otherUserId)
+        ) {
+          if (onMessageUpdated) {
+            onMessageUpdated({
+              id: row.id,
+              sender_id: row.sender_id,
+              receiver_id: row.receiver_id,
+              content: row.content,
+              image_url: row.image_url,
+              read_at: row.read_at,
+              created_at: formatMessageTime(row.created_at),
+            });
+          }
         }
       },
     )
@@ -198,3 +266,36 @@ export function subscribeToMessages(
   };
 }
 
+/**
+ * Broadcasts and listens for live typing indicators between two members.
+ */
+export function subscribeToTypingIndicator(
+  userId: string,
+  otherUserId: string,
+  onTypingChange: (isTyping: boolean) => void,
+): { sendTyping: (isTyping: boolean) => void; unsubscribe: () => void } {
+  const channelName = `typing_${[userId, otherUserId].sort().join("_")}`;
+  const channel = supabase.channel(channelName);
+
+  channel
+    .on("broadcast", { event: "typing" }, (payload) => {
+      if (payload.payload?.sender_id === otherUserId) {
+        onTypingChange(Boolean(payload.payload?.isTyping));
+      }
+    })
+    .subscribe();
+
+  const sendTyping = (isTyping: boolean) => {
+    void channel.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { sender_id: userId, isTyping },
+    });
+  };
+
+  const unsubscribe = () => {
+    void supabase.removeChannel(channel);
+  };
+
+  return { sendTyping, unsubscribe };
+}

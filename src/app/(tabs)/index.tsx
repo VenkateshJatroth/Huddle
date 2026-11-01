@@ -5,6 +5,7 @@ import {
   Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -26,13 +27,19 @@ import {
 } from "../../components/ui";
 import { samplePosts } from "../../data/mockData";
 import {
+  COMMUNITY_CHANNELS,
   deletePost,
   editPost,
   fetchFeedPosts,
   subscribeToPosts,
+  type CommunityChannel,
   type PostAudience,
   type PublishedPost,
 } from "../../lib/posts";
+import {
+  fetchUnreadNotificationCount,
+  subscribeToNotifications,
+} from "../../lib/notifications";
 import {
   demoDiscoverProfiles,
   fetchDiscoverProfiles,
@@ -46,8 +53,10 @@ export default function HomeScreen() {
   const colors = useAppColors();
   const { user } = useAuth();
   const [feedFilter, setFeedFilter] = useState<"For you" | "Following">("For you");
+  const [selectedChannel, setSelectedChannel] = useState<CommunityChannel | "All">("All");
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [communityPosts, setCommunityPosts] = useState<PublishedPost[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Post Editing Modal State
   const [editingPost, setEditingPost] = useState<PublishedPost | null>(null);
@@ -65,17 +74,28 @@ export default function HomeScreen() {
   useEffect(() => {
     if (user?.id) {
       void loadBlockedUserIds(user.id);
+      void fetchUnreadNotificationCount(user.id).then(setUnreadCount);
     }
-    return subscribeToBlockedUsers((ids) => {
+    const unsubBlocked = subscribeToBlockedUsers((ids) => {
       setBlockedIds(ids);
     });
-  }, [user?.id]);
+    const unsubNotifs = user?.id
+      ? subscribeToNotifications(user.id, () => {
+          setUnreadCount((c) => c + 1);
+        })
+      : () => {};
+
+    return () => {
+      unsubBlocked();
+      unsubNotifs();
+    };
+  }, [user]);
 
   useEffect(() => {
     let isCurrent = true;
     async function loadFeed() {
       try {
-        const feed = await fetchFeedPosts(feedFilter, user?.id);
+        const feed = await fetchFeedPosts(feedFilter, user?.id, selectedChannel);
         if (!isCurrent) return;
         setCommunityPosts(feed);
       } catch {
@@ -90,7 +110,7 @@ export default function HomeScreen() {
       isCurrent = false;
       unsubscribe();
     };
-  }, [feedFilter, user]);
+  }, [feedFilter, selectedChannel, user]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -117,11 +137,13 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [live, feed] = await Promise.all([
+      const [live, feed, unread] = await Promise.all([
         user ? fetchDiscoverProfiles(user.id, 5) : Promise.resolve([]),
-        fetchFeedPosts(feedFilter, user?.id),
+        fetchFeedPosts(feedFilter, user?.id, selectedChannel),
+        user ? fetchUnreadNotificationCount(user.id) : Promise.resolve(0),
       ]);
       setCommunityPosts(feed);
+      setUnreadCount(unread);
       if (live && live.length > 0) {
         setSpotlightProfiles(live);
       } else {
@@ -132,7 +154,7 @@ export default function HomeScreen() {
     } finally {
       setRefreshing(false);
     }
-  }, [user, feedFilter]);
+  }, [user, feedFilter, selectedChannel]);
 
   const handleLikeMember = async (profile: DiscoverProfile) => {
     setLikedProfileIds((prev) => ({ ...prev, [profile.id]: true }));
@@ -203,6 +225,12 @@ export default function HomeScreen() {
           <Text style={[styles.brandSubtitle, { color: colors.secondary }]}>Your people, your place</Text>
         </View>
         <IconButton
+          name="bell"
+          label="Notifications"
+          badge={unreadCount > 0 ? String(unreadCount) : undefined}
+          onPress={() => router.push("/notifications" as never)}
+        />
+        <IconButton
           name="settings"
           label="App settings"
           onPress={() => router.push("/settings" as never)}
@@ -246,6 +274,27 @@ export default function HomeScreen() {
           <Text style={[styles.filterHintText, { color: colors.secondary }]}>India</Text>
         </View>
       </View>
+
+      {/* Community Circles Horizontal Strip */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.circlesScroll}
+      >
+        <ChoiceChip
+          label="All Circles"
+          selected={selectedChannel === "All"}
+          onPress={() => setSelectedChannel("All")}
+        />
+        {COMMUNITY_CHANNELS.map((ch) => (
+          <ChoiceChip
+            key={ch}
+            label={`# ${ch}`}
+            selected={selectedChannel === ch}
+            onPress={() => setSelectedChannel(ch)}
+          />
+        ))}
+      </ScrollView>
 
       <Card style={styles.composerCard}>
         <View style={[rowStyles.row, styles.composerTop]}>
@@ -377,6 +426,7 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   filterHint: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 4 },
   filterHintText: { fontSize: 12, fontWeight: "600" },
+  circlesScroll: { gap: 8, paddingVertical: 2 },
   composerCard: { padding: 14, gap: 12 },
   composerTop: { gap: 10 },
   composerPrompt: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, justifyContent: "center" },
