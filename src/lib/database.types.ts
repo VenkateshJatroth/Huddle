@@ -31,6 +31,7 @@ export type Database = {
           gallery_urls: string[] | null;
           is_verified: boolean;
           push_token: string | null;
+          phone?: string | null;
         };
         // Client-writable insert columns
         Insert: {
@@ -49,6 +50,7 @@ export type Database = {
           gallery_urls?: string[] | null;
           is_verified?: boolean;
           push_token?: string | null;
+          phone?: string | null;
         };
         // App updates intentionally exclude ownership, avatar and timestamps.
         Update: {
@@ -66,6 +68,7 @@ export type Database = {
           avatar_url?: string | null;
           gallery_urls?: string[] | null;
           push_token?: string | null;
+          phone?: string | null;
         };
         Relationships: [];
       };

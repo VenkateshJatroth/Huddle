@@ -134,41 +134,90 @@ export const demoDiscoverProfiles: DiscoverProfile[] = [
 // ---------------------------------------------------------------------------
 
 /**
- * Fetches public profiles (excluding the signed-in user) for the Discover feed.
- * Falls back gracefully: returns an empty array on any error so the caller
- * can show demo data.
+ * Fetches public profiles (excluding the signed-in user and any already
+ * followed/connected profiles) for the Discover feed.
+ * Falls back gracefully: returns filtered demo data if no live profiles.
  */
 export async function fetchDiscoverProfiles(
   currentUserId: string,
   limit = 20,
 ): Promise<DiscoverProfile[]> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select(
-      "id, display_name, username, avatar_url, age, location, dating_intention, bio, interests, is_verified, prompts",
-    )
-    .eq("is_private", false)
-    .neq("id", currentUserId)
-    .limit(limit);
+  const excludedIds = new Set<string>();
+  excludedIds.add(currentUserId);
 
-  if (error) throw error;
-  if (!data) return [];
+  // 1. Collect all followed, requested, or connected relationship IDs
+  try {
+    const { data: relationships } = await (supabase as any)
+      .from("follow_relationships")
+      .select("follower_id, following_id")
+      .or(`follower_id.eq.${currentUserId},following_id.eq.${currentUserId}`);
 
-  return data.map((row) => ({
-    id: row.id,
-    display_name: row.display_name,
-    username: row.username,
-    avatar_url: row.avatar_url ?? null,
-    age: row.age ?? null,
-    location: row.location ?? null,
-    dating_intention: row.dating_intention ?? null,
-    bio: row.bio ?? "",
-    interests: Array.isArray(row.interests) ? (row.interests as string[]) : [],
-    is_verified: row.is_verified ?? false,
-    prompts: Array.isArray(row.prompts)
-      ? (row.prompts as { question: string; answer: string }[])
-      : null,
-  }));
+    if (relationships && Array.isArray(relationships)) {
+      relationships.forEach((r: any) => {
+        if (r.follower_id === currentUserId && r.following_id) excludedIds.add(r.following_id);
+        if (r.following_id === currentUserId && r.follower_id) excludedIds.add(r.follower_id);
+      });
+    }
+  } catch {
+    // Non-blocking query guard
+  }
+
+  // 2. Also check local demo relationship store so followed demo users are excluded
+  try {
+    const raw = globalThis.localStorage?.getItem("gormati_demo_relationships_v2");
+    if (raw) {
+      const demoStore = JSON.parse(raw);
+      Object.entries(demoStore).forEach(([id, state]: [string, any]) => {
+        if (state.youFollow || state.status === "accepted" || state.status === "outgoing_pending") {
+          excludedIds.add(id);
+        }
+      });
+    }
+  } catch {
+    // Local storage guard
+  }
+
+  // 3. Query live profiles from Supabase excluding current user
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select(
+        "id, display_name, username, avatar_url, age, location, dating_intention, bio, interests, is_verified, prompts",
+      )
+      .eq("is_private", false)
+      .neq("id", currentUserId)
+      .limit(limit * 2);
+
+    if (!error && data && data.length > 0) {
+      const filtered = data
+        .filter((row) => !excludedIds.has(row.id))
+        .slice(0, limit)
+        .map((row) => ({
+          id: row.id,
+          display_name: row.display_name,
+          username: row.username,
+          avatar_url: row.avatar_url ?? null,
+          age: row.age ?? null,
+          location: row.location ?? null,
+          dating_intention: row.dating_intention ?? null,
+          bio: row.bio ?? "",
+          interests: Array.isArray(row.interests) ? (row.interests as string[]) : [],
+          is_verified: row.is_verified ?? false,
+          prompts: Array.isArray(row.prompts)
+            ? (row.prompts as { question: string; answer: string }[])
+            : null,
+        }));
+
+      if (filtered.length > 0) {
+        return filtered;
+      }
+    }
+  } catch {
+    // Fall back to demo profiles below
+  }
+
+  // 4. Fallback to demo profiles, filtering out any already followed/connected
+  return demoDiscoverProfiles.filter((p) => !excludedIds.has(p.id));
 }
 
 // ---------------------------------------------------------------------------

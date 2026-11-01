@@ -153,32 +153,35 @@ export default function DiscoverScreen() {
     }
   };
 
-  // Like interaction
+  // Like interaction - optimistically removes profile so it never reappears
   const handleLike = async (profile: DiscoverProfile) => {
     setLikedIds((prev) => ({ ...prev, [profile.id]: true }));
+    setDiscoverProfiles((prev) => prev.filter((p) => p.id !== profile.id));
     try {
-      // Record like in Supabase or demo state
+      // Record like / follow in Supabase or demo state
       await followProfile(profile.id, user?.id);
     } catch {
-      // If error (or demo profile), keep client visual feedback intact
+      // Non-blocking interaction
     }
   };
 
-  // Pass interaction
+  // Pass interaction - optimistically removes profile
   const handlePass = (profile: DiscoverProfile) => {
     setPassedIds((prev) => ({ ...prev, [profile.id]: true }));
+    setDiscoverProfiles((prev) => prev.filter((p) => p.id !== profile.id));
   };
 
   // Filtered discover cards
   const visibleDiscoverProfiles = useMemo(() => {
     return discoverProfiles
+      .filter((p) => !likedIds[p.id])
       .filter((p) => !passedIds[p.id])
       .filter((p) => !blockedIds.includes(p.id))
       .filter((p) => {
         if (!selectedInterest) return true;
         return p.interests?.includes(selectedInterest);
       });
-  }, [discoverProfiles, passedIds, blockedIds, selectedInterest]);
+  }, [discoverProfiles, likedIds, passedIds, blockedIds, selectedInterest]);
 
   return (
     <AppScreen

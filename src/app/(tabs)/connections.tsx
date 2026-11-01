@@ -194,12 +194,12 @@ export default function ConnectionsScreen() {
                   secondaryAction={(
                     <View style={styles.actionRow}>
                       <AppButton
-                        label={isBusy ? "Please wait…" : "Approve"}
+                        label={isBusy ? "Please wait…" : "Follow Back / Accept"}
                         disabled={busyKey !== null}
                         onPress={() => { void performAction(key, () => approveFollowRequest(relationship.requester_id, user?.id)); }}
                       />
                       <AppButton
-                        label="Reject"
+                        label="Decline"
                         variant="outline"
                         disabled={busyKey !== null}
                         onPress={() => { void performAction(key, () => rejectFollowRequest(relationship.requester_id, user?.id)); }}

@@ -1,5 +1,6 @@
 import type { Database } from "./database.types";
 import { supabase } from "./supabase";
+import { createNotification } from "./notifications";
 
 export type RelationshipStatus = "pending" | "accepted";
 export type FollowRelationship = Database["public"]["Tables"]["follow_relationships"]["Row"];
@@ -218,6 +219,19 @@ export async function searchDirectoryProfiles(query: string, limit = 20): Promis
   return results.slice(0, limit);
 }
 
+async function getCurrentUserName(userId: string): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("display_name, full_name")
+      .eq("id", userId)
+      .maybeSingle();
+    return data?.display_name || data?.full_name || "A GorMati member";
+  } catch {
+    return "A GorMati member";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Follow / Connect
 // ---------------------------------------------------------------------------
@@ -258,6 +272,23 @@ export async function followProfile(targetId: string, currentUserId?: string): P
           status: "accepted",
         });
       }
+
+      // Real-time follow notification dispatch to target user
+      void (async () => {
+        try {
+          const actorName = await getCurrentUserName(currentUserId);
+          await createNotification({
+            userId: targetId,
+            actorId: currentUserId,
+            actorName,
+            type: "follow",
+            referenceId: currentUserId,
+            content: "started following you. Tap to follow back!",
+          });
+        } catch {
+          // Non-blocking notification dispatch
+        }
+      })();
     }
     return "accepted";
   } catch {
@@ -302,6 +333,23 @@ export async function approveFollowRequest(requesterId: string, currentUserId?: 
           },
           { onConflict: "follower_id,following_id" },
         );
+
+      // Send follow-back / acceptance notification
+      void (async () => {
+        try {
+          const actorName = await getCurrentUserName(currentUserId);
+          await createNotification({
+            userId: requesterId,
+            actorId: currentUserId,
+            actorName,
+            type: "follow",
+            referenceId: currentUserId,
+            content: "accepted your follow request and connected with you!",
+          });
+        } catch {
+          // Non-blocking notification dispatch
+        }
+      })();
     }
     return true;
   } catch {
