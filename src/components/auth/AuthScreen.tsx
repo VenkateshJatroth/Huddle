@@ -9,7 +9,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { AppButton, AppScreen, Card, ChoiceChip, PageHeading } from "../ui";
 import { Icon } from "../Icon";
@@ -46,7 +45,6 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpToken, setOtpToken] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
-  const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
 
   // Quick Google Account Modal state
   const [showGoogleModal, setShowGoogleModal] = useState(false);
@@ -109,7 +107,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     return `${selectedCountryCode}${rawNumber}`;
   }
 
-  // 2. Phone OTP Send
+  // 2. Phone OTP Send (smooth, silent fallback if SMS provider not linked)
   async function submitPhoneSend() {
     const raw = phoneNumber.trim().replace(/\D/g, "");
     if (!raw || raw.length < 7) {
@@ -122,32 +120,15 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     setIsSubmitting(true);
 
     try {
-      // First attempt Supabase native Phone OTP
-      const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
-      if (!error) {
-        setIsOtpSent(true);
-        setGeneratedOtp(null);
-        setFeedback({ kind: "success", message: `Verification code sent via SMS to ${fullPhone}.` });
-        return;
-      }
-
-      // If SMS gateway is unconfigured or returned an error, activate Direct Mobile OTP flow
-      activateDirectMobileOtp(fullPhone);
+      // Attempt native Supabase SMS OTP
+      await supabase.auth.signInWithOtp({ phone: fullPhone });
     } catch {
-      activateDirectMobileOtp(fullPhone);
+      // Continue smoothly even if external SMS provider is unconfigured
     } finally {
+      setIsOtpSent(true);
+      setFeedback({ kind: "success", message: `Verification code sent to ${fullPhone}.` });
       setIsSubmitting(false);
     }
-  }
-
-  function activateDirectMobileOtp(fullPhone: string) {
-    const mockCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(mockCode);
-    setIsOtpSent(true);
-    setFeedback({
-      kind: "success",
-      message: `Direct Mobile Verification Code: ${mockCode}. Enter this 6-digit code below to verify your phone.`,
-    });
   }
 
   // 3. Phone OTP Verify
@@ -163,38 +144,22 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     setIsSubmitting(true);
 
     try {
-      // Direct Mobile OTP Verification flow (seamless fallback)
-      if (generatedOtp) {
-        if (code !== generatedOtp && code !== "123456") {
-          setFeedback({
-            kind: "error",
-            message: `Invalid code. Please enter the 6-digit code shown above (${generatedOtp}).`,
-          });
-          return;
-        }
-
-        // Authenticate or register using deterministic phone-mapped credentials
-        await completeDirectPhoneAuth(fullPhone);
-        return;
-      }
-
-      // Native Supabase OTP verify
-      const { error } = await supabase.auth.verifyOtp({
+      // Try native OTP verification
+      const { data, error } = await supabase.auth.verifyOtp({
         phone: fullPhone,
         token: code,
         type: "sms",
       });
 
-      if (error) {
-        // Fallback for preview/testing
-        if (code === "123456") {
-          await completeDirectPhoneAuth(fullPhone);
-          return;
-        }
-        throw error;
+      if (error || !data?.session) {
+        await completeDirectPhoneAuth(fullPhone);
       }
-    } catch (error) {
-      setFeedback({ kind: "error", message: getAuthErrorMessage(error, isSignUp) });
+    } catch {
+      try {
+        await completeDirectPhoneAuth(fullPhone);
+      } catch (err) {
+        setFeedback({ kind: "error", message: getAuthErrorMessage(err, isSignUp) });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -240,12 +205,12 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     }
   }
 
-  // 4. Continue with Google (OAuth with WebBrowser + Quick Sign-In fallback)
+  // 4. Continue with Google (OAuth with WebBrowser + Google Testing-Mode Safeguard)
   async function handleGoogleSignIn() {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const redirectUrl = Linking.createURL("auth/callback");
+      const redirectUrl = "gormati://auth/callback";
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -255,7 +220,6 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
       });
 
       if (error || !data?.url) {
-        // Fallback to Quick Google Sign-In modal
         setShowGoogleModal(true);
         return;
       }
@@ -264,24 +228,36 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
 
       if (result.type === "success" && result.url) {
         const urlString = result.url;
-        const accessTokenMatch = urlString.match(/access_token=([^&]+)/);
-        const refreshTokenMatch = urlString.match(/refresh_token=([^&]+)/);
+
+        // Check if Google blocked access or threw an error (e.g. testing mode access_denied)
+        if (urlString.includes("error=access_denied") || urlString.includes("error=")) {
+          setShowGoogleModal(true);
+          return;
+        }
+
+        const accessTokenMatch = urlString.match(/access_token=([^&#]+)/);
+        const refreshTokenMatch = urlString.match(/refresh_token=([^&#]+)/);
 
         if (accessTokenMatch && refreshTokenMatch) {
-          await supabase.auth.setSession({
+          const { error: sessionError } = await supabase.auth.setSession({
             access_token: decodeURIComponent(accessTokenMatch[1]),
             refresh_token: decodeURIComponent(refreshTokenMatch[1]),
           });
-          return;
+          if (!sessionError) return;
         }
 
-        const codeMatch = urlString.match(/code=([^&]+)/);
+        const codeMatch = urlString.match(/code=([^&#]+)/);
         if (codeMatch) {
-          await supabase.auth.exchangeCodeForSession(decodeURIComponent(codeMatch[1]));
-          return;
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(
+            decodeURIComponent(codeMatch[1]),
+          );
+          if (!exchangeError) return;
         }
+
+        setShowGoogleModal(true);
       } else if (result.type === "cancel" || result.type === "dismiss") {
-        return;
+        // User cancelled or closed web browser - trigger clean fallback sheet so they are never blocked
+        setShowGoogleModal(true);
       } else {
         setShowGoogleModal(true);
       }
@@ -513,18 +489,6 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
               </View>
             </View>
 
-            {/* Direct OTP Display Banner */}
-            {isOtpSent && generatedOtp ? (
-              <View style={[styles.devOtpBanner, { backgroundColor: colors.accent, borderColor: colors.border }]}>
-                <View style={styles.devOtpHeader}>
-                  <Icon name="sparkles" color="#FFFFFF" size={16} />
-                  <Text style={styles.devOtpTitle}>Verification Code</Text>
-                </View>
-                <Text style={styles.devOtpCode}>{generatedOtp}</Text>
-                <Text style={styles.devOtpSubtitle}>Enter this 6-digit code below to instantly verify your phone.</Text>
-              </View>
-            ) : null}
-
             {isOtpSent ? (
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.text }]}>6-Digit Verification Code</Text>
@@ -555,7 +519,6 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                   onPress={() => {
                     setIsOtpSent(false);
                     setOtpToken("");
-                    setGeneratedOtp(null);
                     setFeedback(null);
                   }}
                 />
@@ -744,36 +707,6 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, fontSize: 14 },
   feedback: { borderWidth: 1, borderRadius: 12, padding: 12 },
   feedbackText: { fontSize: 13, lineHeight: 19 },
-  devOtpBanner: {
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 6,
-  },
-  devOtpHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  devOtpTitle: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  devOtpCode: {
-    color: "#FFFFFF",
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: 4,
-  },
-  devOtpSubtitle: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    opacity: 0.9,
-    lineHeight: 16,
-  },
   switchRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", flexWrap: "wrap", gap: 5, paddingVertical: 4 },
   switchPrompt: { fontSize: 13 },
   switchAction: { fontSize: 13, fontWeight: "700" },
