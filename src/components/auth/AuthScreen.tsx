@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "expo-router";
+import { Link, useLocalSearchParams } from "expo-router";
 import {
   Alert,
   Modal,
@@ -47,7 +47,8 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
   const [isOtpSent, setIsOtpSent] = useState(false);
 
   // Quick Google Account Modal state
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const searchParams = useLocalSearchParams<{ oauth_fallback?: string }>();
+  const [showGoogleModal, setShowGoogleModal] = useState(() => searchParams.oauth_fallback === "true");
   const [googleEmail, setGoogleEmail] = useState("");
   const [googleName, setGoogleName] = useState("");
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
