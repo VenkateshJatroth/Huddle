@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  BackHandler,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -34,6 +35,23 @@ export default function SettingsScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [blockedCount, setBlockedCount] = useState(0);
+
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  }, []);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      handleBack();
+      return true;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, [handleBack]);
 
   const [notifications, setNotifications] = useState<NotificationSettings>(() => {
     try {
@@ -121,10 +139,10 @@ export default function SettingsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          onPress={() => router.back()}
+          onPress={handleBack}
           style={styles.backButton}
         >
-          <Icon name="chevronRight" color={colors.text} size={20} />
+          <Icon name="chevronLeft" color={colors.text} size={20} />
           <Text style={[styles.backText, { color: colors.text }]}>Back</Text>
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
@@ -312,7 +330,7 @@ export default function SettingsScreen() {
           <Card style={styles.card}>
             <View style={styles.infoRow}>
               <Text style={[styles.infoLabel, { color: colors.secondary }]}>Version</Text>
-              <Text style={[styles.infoValue, { color: colors.text }]}>1.2.5 (Build 9)</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>1.2.6 (Build 10)</Text>
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <AppButton

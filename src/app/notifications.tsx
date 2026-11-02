@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   FlatList,
   Pressable,
   RefreshControl,
@@ -32,6 +33,23 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [followedBackIds, setFollowedBackIds] = useState<Record<string, boolean>>({});
   const [busyFollowId, setBusyFollowId] = useState<string | null>(null);
+
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  }, []);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      handleBack();
+      return true;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, [handleBack]);
 
   const loadNotifs = useCallback(async () => {
     if (!user) return;
@@ -111,10 +129,10 @@ export default function NotificationsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
-          onPress={() => router.back()}
+          onPress={handleBack}
           style={styles.backButton}
         >
-          <Icon name="chevronRight" color={colors.text} size={20} />
+          <Icon name="chevronLeft" color={colors.text} size={20} />
         </Pressable>
 
         <View style={styles.headerTitleWrap}>

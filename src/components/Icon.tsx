@@ -16,6 +16,7 @@ export type AppIconName =
   | "person"
   | "check"
   | "chevronRight"
+  | "chevronLeft"
   | "location"
   | "language"
   | "more"
@@ -38,6 +39,7 @@ const iconNames = {
   person: { ios: "person.crop.circle", android: "account_circle", web: "account_circle" },
   check: { ios: "checkmark", android: "check", web: "check" },
   chevronRight: { ios: "chevron.right", android: "chevron_right", web: "chevron_right" },
+  chevronLeft: { ios: "chevron.left", android: "arrow_back", web: "arrow_back" },
   location: { ios: "mappin.and.ellipse", android: "location_on", web: "location_on" },
   language: { ios: "character.bubble", android: "translate", web: "translate" },
   more: { ios: "ellipsis", android: "more_horiz", web: "more_horiz" },

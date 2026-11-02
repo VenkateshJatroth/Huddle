@@ -47,6 +47,7 @@ import {
 import type { DiscoverProfile } from "../../lib/gormati-profiles";
 import { followProfile } from "../../lib/relationships";
 import { loadBlockedUserIds, subscribeToBlockedUsers } from "../../lib/safety";
+import { supabase } from "../../lib/supabase";
 import { useAppColors } from "../../theme/colors";
 
 export default function HomeScreen() {
@@ -68,6 +69,7 @@ export default function HomeScreen() {
   const [spotlightProfiles, setSpotlightProfiles] = useState<DiscoverProfile[]>([]);
   const [likedProfileIds, setLikedProfileIds] = useState<Record<string, boolean>>({});
   const [passedProfileIds, setPassedProfileIds] = useState<Record<string, boolean>>({});
+  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -112,52 +114,76 @@ export default function HomeScreen() {
     };
   }, [feedFilter, selectedChannel, user]);
 
+  const fetchFollowedIds = useCallback(async (): Promise<Set<string>> => {
+    if (!user) return new Set<string>();
+    try {
+      const { data } = await (supabase as any)
+        .from("follow_relationships")
+        .select("following_id")
+        .eq("follower_id", user.id);
+      if (data && Array.isArray(data)) {
+        const set = new Set<string>(data.map((r: any) => r.following_id));
+        setFollowedIds(set);
+        return set;
+      }
+    } catch {
+      // Non-blocking
+    }
+    return new Set<string>();
+  }, [user]);
+
+  const loadSpotlight = useCallback(async () => {
+    try {
+      const [live, rels] = await Promise.all([
+        user ? fetchDiscoverProfiles(user.id, 8) : Promise.resolve(demoDiscoverProfiles),
+        fetchFollowedIds(),
+      ]);
+      const filtered = (live || []).filter((p) => !rels.has(p.id));
+      setSpotlightProfiles(filtered);
+    } catch {
+      setSpotlightProfiles([]);
+    }
+  }, [user, fetchFollowedIds]);
+
   useEffect(() => {
     let isCurrent = true;
-    async function fetchSpotlight() {
+    async function init() {
       try {
-        const live = user ? await fetchDiscoverProfiles(user.id, 5) : [];
+        const [live, rels] = await Promise.all([
+          user ? fetchDiscoverProfiles(user.id, 8) : Promise.resolve(demoDiscoverProfiles),
+          fetchFollowedIds(),
+        ]);
         if (!isCurrent) return;
-        if (live && live.length > 0) {
-          setSpotlightProfiles(live);
-        } else {
-          setSpotlightProfiles(demoDiscoverProfiles);
-        }
+        const filtered = (live || []).filter((p) => !rels.has(p.id));
+        setSpotlightProfiles(filtered);
       } catch {
-        if (!isCurrent) return;
-        setSpotlightProfiles(demoDiscoverProfiles);
+        if (isCurrent) setSpotlightProfiles([]);
       }
     }
-    void fetchSpotlight();
+    void init();
     return () => {
       isCurrent = false;
     };
-  }, [user]);
+  }, [user, fetchFollowedIds]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [live, feed, unread] = await Promise.all([
-        user ? fetchDiscoverProfiles(user.id, 5) : Promise.resolve([]),
+      const [, feed, unread] = await Promise.all([
+        loadSpotlight(),
         fetchFeedPosts(feedFilter, user?.id, selectedChannel),
         user ? fetchUnreadNotificationCount(user.id) : Promise.resolve(0),
       ]);
       setCommunityPosts(feed);
       setUnreadCount(unread);
-      if (live && live.length > 0) {
-        setSpotlightProfiles(live);
-      } else {
-        setSpotlightProfiles(demoDiscoverProfiles);
-      }
-    } catch {
-      setSpotlightProfiles(demoDiscoverProfiles);
     } finally {
       setRefreshing(false);
     }
-  }, [user, feedFilter, selectedChannel]);
+  }, [loadSpotlight, feedFilter, user, selectedChannel]);
 
   const handleLikeMember = async (profile: DiscoverProfile) => {
     setLikedProfileIds((prev) => ({ ...prev, [profile.id]: true }));
+    setFollowedIds((prev) => new Set([...prev, profile.id]));
     try {
       await followProfile(profile.id, user?.id);
     } catch {
@@ -197,6 +223,8 @@ export default function HomeScreen() {
   };
 
   const visibleSpotlight = spotlightProfiles
+    .filter((p) => !followedIds.has(p.id))
+    .filter((p) => !likedProfileIds[p.id])
     .filter((p) => !passedProfileIds[p.id])
     .filter((p) => !blockedIds.includes(p.id));
   const visiblePosts = feedFilter === "For you"
@@ -229,6 +257,11 @@ export default function HomeScreen() {
           label="Notifications"
           badge={unreadCount > 0 ? String(unreadCount) : undefined}
           onPress={() => router.push("/notifications" as never)}
+        />
+        <IconButton
+          name="search"
+          label="Search & Discover"
+          onPress={() => router.push("/discover" as never)}
         />
         <IconButton
           name="settings"

@@ -81,8 +81,12 @@ export async function fetchNotifications(userId: string): Promise<InAppNotificat
       .order("created_at", { ascending: false })
       .limit(30);
 
-    if (error || !data || data.length === 0) {
-      return demoNotifications;
+    if (error || !data) {
+      return [];
+    }
+
+    if (data.length === 0) {
+      return [];
     }
 
     return (data as any[]).map((n) => ({
@@ -90,7 +94,7 @@ export async function fetchNotifications(userId: string): Promise<InAppNotificat
       time: formatTimeAgo(n.created_at),
     }));
   } catch {
-    return demoNotifications;
+    return [];
   }
 }
 
@@ -103,12 +107,12 @@ export async function fetchUnreadNotificationCount(userId: string): Promise<numb
       .eq("is_read", false);
 
     if (error || count == null) {
-      return demoNotifications.filter((n) => !n.is_read).length;
+      return 0;
     }
 
     return count;
   } catch {
-    return demoNotifications.filter((n) => !n.is_read).length;
+    return 0;
   }
 }
 
@@ -311,4 +315,75 @@ export function useNotificationObserver() {
       subscription?.remove();
     };
   }, []);
+}
+
+/**
+ * Sends a gentle push/in-app reminder to encourage users to share updates and post inside GorMati.
+ * Triggers at most once every 24 hours if the user hasn't shared a post recently.
+ */
+export async function checkAndTriggerEngagementReminder(userId: string): Promise<void> {
+  if (!userId) return;
+
+  const storageKey = `gormati_last_engagement_reminder_${userId}`;
+  try {
+    const lastReminder = globalThis.localStorage?.getItem(storageKey);
+    if (lastReminder) {
+      const elapsed = Date.now() - Number(lastReminder);
+      // Run once every 24 hours
+      if (elapsed < 24 * 60 * 60 * 1000) {
+        return;
+      }
+    }
+  } catch {
+    // Storage guard
+  }
+
+  try {
+    // Check if user has posted recently (in the last 24h)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count } = await (supabase as any)
+      .from("posts")
+      .select("*", { count: "exact", head: true })
+      .eq("author_id", userId)
+      .gte("created_at", oneDayAgo);
+
+    if (count && count > 0) {
+      // User is already active; record timestamp and skip
+      globalThis.localStorage?.setItem(storageKey, String(Date.now()));
+      return;
+    }
+
+    // Insert gentle in-app reminder
+    await (supabase as any).from("notifications").insert({
+      user_id: userId,
+      actor_name: "GorMati Community",
+      type: "reply",
+      content: "What's happening in your world? Share a thought, photo, or update with your circles ✨",
+      reference_id: "create",
+      is_read: false,
+    });
+
+    // Schedule gentle native local push notification if permissions granted
+    if (Platform.OS !== "web" && !isRunningInExpoGo()) {
+      try {
+        const { status } = await Notifications.getPermissionsAsync();
+        if (status === "granted") {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: "GorMati Community ✨",
+              body: "What's new with you today? Share a story, photo, or thought with your circles!",
+              data: { url: "/create" },
+            },
+            trigger: null,
+          });
+        }
+      } catch {
+        // Notification schedule guard
+      }
+    }
+
+    globalThis.localStorage?.setItem(storageKey, String(Date.now()));
+  } catch {
+    // Non-blocking
+  }
 }

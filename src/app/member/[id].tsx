@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   Dimensions,
   Pressable,
   ScrollView,
@@ -41,6 +42,23 @@ export default function MemberProfileDetailScreen() {
 
   const [profile, setProfile] = useState<GormatiProfile | null>(null);
   const [memberPosts, setMemberPosts] = useState<PublishedPost[]>([]);
+
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  }, []);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      handleBack();
+      return true;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, [handleBack]);
   const [isLoading, setIsLoading] = useState(true);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
@@ -151,10 +169,10 @@ export default function MemberProfileDetailScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          onPress={() => router.back()}
+          onPress={handleBack}
           style={styles.backButton}
         >
-          <Icon name="chevronRight" color={colors.text} size={20} />
+          <Icon name="chevronLeft" color={colors.text} size={20} />
         </Pressable>
         <Text numberOfLines={1} style={[styles.navTitle, { color: colors.text }]}>
           {profile.display_name}

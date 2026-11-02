@@ -26,13 +26,13 @@ export default function NativeTabLayout() {
             <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
             <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} md="home" />
           </NativeTabs.Trigger>
-          <NativeTabs.Trigger name="discover">
-            <NativeTabs.Trigger.Label>Discover</NativeTabs.Trigger.Label>
-            <NativeTabs.Trigger.Icon sf="magnifyingglass" md="search" />
-          </NativeTabs.Trigger>
           <NativeTabs.Trigger name="create">
             <NativeTabs.Trigger.Label>Create</NativeTabs.Trigger.Label>
             <NativeTabs.Trigger.Icon sf={{ default: "plus.circle", selected: "plus.circle.fill" }} md="add_circle" />
+          </NativeTabs.Trigger>
+          <NativeTabs.Trigger name="chat">
+            <NativeTabs.Trigger.Label>Chat</NativeTabs.Trigger.Label>
+            <NativeTabs.Trigger.Icon sf={{ default: "bubble.left.and.bubble.right", selected: "bubble.left.and.bubble.right.fill" }} md="chat" />
           </NativeTabs.Trigger>
           <NativeTabs.Trigger name="connections">
             <NativeTabs.Trigger.Label>Connections</NativeTabs.Trigger.Label>

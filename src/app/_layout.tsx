@@ -4,7 +4,11 @@ import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
 import { UpdateNotificationBanner } from "../components/UpdateNotificationBanner";
-import { registerForPushNotificationsAsync, useNotificationObserver } from "../lib/notifications";
+import {
+  checkAndTriggerEngagementReminder,
+  registerForPushNotificationsAsync,
+  useNotificationObserver,
+} from "../lib/notifications";
 import { setupUpdateLifecycle } from "../lib/updates";
 import { AppThemeProvider, useAppColors } from "../theme/colors";
 
@@ -30,10 +34,11 @@ function RootNavigator() {
     return setupUpdateLifecycle();
   }, []);
 
-  // Register push notifications when user is authenticated
+  // Register push notifications & check engagement reminders when user is authenticated
   useEffect(() => {
     if (user?.id) {
       registerForPushNotificationsAsync(user.id);
+      void checkAndTriggerEngagementReminder(user.id);
     }
   }, [user?.id]);
 
@@ -48,6 +53,8 @@ function RootNavigator() {
         <Stack.Screen name="member/[id]" options={{ presentation: "card" }} />
         <Stack.Screen name="chat/[id]" options={{ presentation: "card" }} />
         <Stack.Screen name="settings" options={{ presentation: "card" }} />
+        <Stack.Screen name="notifications" options={{ presentation: "card" }} />
+        <Stack.Screen name="discover" options={{ presentation: "card" }} />
       </Stack>
     </View>
   );

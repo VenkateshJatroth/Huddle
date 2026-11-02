@@ -5,10 +5,10 @@ import { AuthenticatedRouteGuard } from "../../components/auth/AuthRouteGuard";
 import { Icon, type AppIconName } from "../../components/Icon";
 import { navigationColors } from "../../theme/colors";
 
-const tabs: { label: string; href: "/" | "/discover" | "/create" | "/connections" | "/profile"; icon: AppIconName }[] = [
+const tabs: { label: string; href: "/" | "/create" | "/chat" | "/connections" | "/profile"; icon: AppIconName }[] = [
   { label: "Home", href: "/", icon: "home" },
-  { label: "Discover", href: "/discover", icon: "search" },
   { label: "Create", href: "/create", icon: "plus" },
+  { label: "Chat", href: "/chat", icon: "chat" },
   { label: "Connections", href: "/connections", icon: "people" },
   { label: "Profile", href: "/profile", icon: "person" },
 ];
@@ -37,7 +37,7 @@ function WebNavigationLayout() {
               const foreground = selected ? "#FFFFFF" : navigationColors.inactive;
 
               return (
-                <Link key={tab.href} href={tab.href} asChild>
+                <Link key={tab.href} href={tab.href as any} asChild>
                   <Pressable
                     accessibilityLabel={tab.label}
                     aria-current={selected ? "page" : undefined}
