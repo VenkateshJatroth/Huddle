@@ -17,7 +17,7 @@ export function ProfileCompletionBanner({
 }: ProfileCompletionBannerProps) {
   const colors = useAppColors();
 
-  if (completion.isComplete) {
+  if (completion.completionPercentage >= 100 || completion.isFullyComplete) {
     return null;
   }
 
@@ -67,11 +67,11 @@ export function ProfileCompletionBanner({
       </View>
 
       {/* Missing Fields Chips */}
-      {completion.missingFields.length > 0 ? (
+      {completion.missingFieldDetails && completion.missingFieldDetails.length > 0 ? (
         <View style={styles.missingFieldsRow}>
           <Text style={[styles.missingLabel, { color: colors.secondary }]}>Missing:</Text>
           <View style={styles.chipsWrap}>
-            {completion.missingFields.map((field) => (
+            {completion.missingFieldDetails.map((field) => (
               <View
                 key={field.id}
                 style={[
@@ -84,6 +84,28 @@ export function ProfileCompletionBanner({
               >
                 <Text style={[styles.missingChipText, { color: colors.text }]}>
                   + {field.shortLabel}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : completion.missingFields.length > 0 ? (
+        <View style={styles.missingFieldsRow}>
+          <Text style={[styles.missingLabel, { color: colors.secondary }]}>Missing:</Text>
+          <View style={styles.chipsWrap}>
+            {completion.missingFields.map((label, idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.missingChip,
+                  {
+                    backgroundColor: colors.subtle,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.missingChipText, { color: colors.text }]}>
+                  + {label}
                 </Text>
               </View>
             ))}

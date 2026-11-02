@@ -298,7 +298,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Profile Completion Reminder Banner */}
-      {profileCompletion && !profileCompletion.isComplete ? (
+      {profileCompletion && profileCompletion.completionPercentage < 100 ? (
         <ProfileCompletionBanner
           completion={profileCompletion}
           onCompletePress={() =>

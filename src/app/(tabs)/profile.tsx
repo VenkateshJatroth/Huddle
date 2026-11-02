@@ -546,7 +546,7 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
         </View>
       ) : null}
 
-      {profile && completion && !completion.isComplete ? (
+      {profile && completion && completion.completionPercentage < 100 ? (
         <ProfileCompletionBanner
           completion={completion}
           onCompletePress={startEditing}

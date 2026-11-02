@@ -1,9 +1,14 @@
 import { useEffect } from "react";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
 import { UpdateNotificationBanner } from "../components/UpdateNotificationBanner";
+import { fetchFullProfile } from "../lib/gormati-profiles";
+import {
+  checkAndTriggerProfileCompletionReminder,
+  getProfileCompletion,
+} from "../lib/profileCompletion";
 import {
   checkAndTriggerEngagementReminder,
   registerForPushNotificationsAsync,
@@ -41,6 +46,16 @@ function RootNavigator() {
       registerForPushNotificationsAsync(user.id);
       void checkAndTriggerEngagementReminder(user.id);
       void checkDailyStreakReminder(user.id);
+
+      // Verify core profile completion gate
+      void fetchFullProfile(user.id).then((profile) => {
+        const completion = getProfileCompletion(profile);
+        if (!completion.isCoreComplete) {
+          router.replace("/onboarding-profile" as never);
+        } else if (!completion.isFullyComplete) {
+          void checkAndTriggerProfileCompletionReminder(user.id, profile);
+        }
+      });
     }
   }, [user?.id]);
 
@@ -51,6 +66,10 @@ function RootNavigator() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="onboarding-profile"
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
         <Stack.Screen name="onboarding" options={{ presentation: "modal" }} />
         <Stack.Screen name="member/[id]" options={{ presentation: "card" }} />
         <Stack.Screen name="chat/[id]" options={{ presentation: "card" }} />

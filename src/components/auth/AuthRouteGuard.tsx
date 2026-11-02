@@ -1,14 +1,44 @@
-import type { PropsWithChildren } from "react";
+import { useEffect, useState, type PropsWithChildren } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Redirect } from "expo-router";
 import { useAuth } from "../../auth/AuthProvider";
+import { fetchFullProfile } from "../../lib/gormati-profiles";
+import { getProfileCompletion } from "../../lib/profileCompletion";
 import { useAppColors } from "../../theme/colors";
 
 export function AuthenticatedRouteGuard({ children }: PropsWithChildren) {
-  const { isLoading, session } = useAuth();
+  const { isLoading, session, user } = useAuth();
+  const [checkingProfile, setCheckingProfile] = useState(true);
+  const [isCoreComplete, setIsCoreComplete] = useState<boolean | null>(null);
 
-  if (isLoading) return <AuthLoadingScreen />;
+  useEffect(() => {
+    let isCurrent = true;
+    async function verify() {
+      if (!user) {
+        if (isCurrent) setCheckingProfile(false);
+        return;
+      }
+      try {
+        const profile = await fetchFullProfile(user.id);
+        if (!isCurrent) return;
+        const completion = getProfileCompletion(profile);
+        setIsCoreComplete(completion.isCoreComplete);
+      } catch {
+        // Do not block on network failure
+        if (isCurrent) setIsCoreComplete(true);
+      } finally {
+        if (isCurrent) setCheckingProfile(false);
+      }
+    }
+    void verify();
+    return () => {
+      isCurrent = false;
+    };
+  }, [user]);
+
+  if (isLoading || checkingProfile) return <AuthLoadingScreen />;
   if (!session) return <Redirect href="/sign-in" />;
+  if (isCoreComplete === false) return <Redirect href={"/onboarding-profile" as never} />;
   return children;
 }
 

@@ -5,18 +5,30 @@ import type { GormatiProfile } from "./gormati-profiles";
 import { supabase } from "./supabase";
 
 export type MissingProfileField = {
-  id: "avatar" | "display_name" | "bio" | "location" | "interests" | "prompts_or_voice";
+  id:
+    | "avatar"
+    | "display_name"
+    | "bio"
+    | "location"
+    | "interests"
+    | "voice_intro"
+    | "prompts";
   label: string;
   shortLabel: string;
 };
 
-export type ProfileCompletionResult = {
+export type ProfileCompletion = {
   completionPercentage: number;
-  isComplete: boolean;
-  missingFields: MissingProfileField[];
+  isCoreComplete: boolean;
+  isFullyComplete: boolean;
+  missingFields: string[];
+  missingFieldDetails: MissingProfileField[];
   completedCount: number;
   totalCount: number;
 };
+
+// Alias for backwards compatibility
+export type ProfileCompletionResult = ProfileCompletion;
 
 function isRunningInExpoGo(): boolean {
   try {
@@ -30,19 +42,28 @@ function isRunningInExpoGo(): boolean {
 }
 
 /**
- * Evaluates the completion state of a Gormati member profile.
- * Inspects avatar, display name, bio (10+ chars), city/location,
- * interests tags, and prompt answers or voice introduction.
+ * Calculates profile completion status.
+ * Evaluates core mandatory fields:
+ * - display_name (non-empty, >= 2 chars, not default placeholder)
+ * - bio (at least 15 chars)
+ * - location / city (non-empty)
+ * - interests (at least 3 selected)
+ * - avatar_url (or gallery photo)
+ *
+ * Plus optional enrichment fields:
+ * - voice intro
+ * - prompt answers
  */
-export function checkProfileCompletion(
+export function getProfileCompletion(
   profile?: Partial<GormatiProfile> | null,
-): ProfileCompletionResult {
-  const missingFields: MissingProfileField[] = [];
+): ProfileCompletion {
+  const missingFieldDetails: MissingProfileField[] = [];
+  const missingFields: string[] = [];
   let completionPercentage = 0;
   let completedCount = 0;
-  const totalCount = 6;
+  const totalCount = 7;
 
-  // 1. Avatar / Photo (20%)
+  // 1. Profile Photo / Avatar (20% - Core)
   const hasAvatar = Boolean(
     (profile?.avatar_url && profile.avatar_url.trim().length > 0) ||
       (Array.isArray(profile?.gallery_urls) && profile.gallery_urls.length > 0),
@@ -51,100 +72,141 @@ export function checkProfileCompletion(
     completionPercentage += 20;
     completedCount += 1;
   } else {
-    missingFields.push({
+    missingFields.push("Upload a profile photo");
+    missingFieldDetails.push({
       id: "avatar",
       label: "Upload a profile photo",
       shortLabel: "Photo",
     });
   }
 
-  // 2. Display Name (15%)
+  // 2. Display Name (15% - Core)
   const displayName = profile?.display_name?.trim();
+  const lowerName = displayName?.toLowerCase() ?? "";
   const hasDisplayName = Boolean(
-    displayName && displayName.length >= 2 && displayName.toLowerCase() !== "member",
+    displayName &&
+      displayName.length >= 2 &&
+      lowerName !== "member" &&
+      lowerName !== "gormati member" &&
+      !lowerName.startsWith("user_"),
   );
   if (hasDisplayName) {
     completionPercentage += 15;
     completedCount += 1;
   } else {
-    missingFields.push({
+    missingFields.push("Set your display name");
+    missingFieldDetails.push({
       id: "display_name",
       label: "Set your display name",
       shortLabel: "Name",
     });
   }
 
-  // 3. Bio - at least 10 characters (20%)
+  // 3. Bio - at least 15 characters (20% - Core)
   const bio = profile?.bio?.trim();
-  const hasBio = Boolean(bio && bio.length >= 10);
+  const hasBio = Boolean(bio && bio.length >= 15);
   if (hasBio) {
     completionPercentage += 20;
     completedCount += 1;
   } else {
-    missingFields.push({
+    missingFields.push("Add a bio (15+ chars)");
+    missingFieldDetails.push({
       id: "bio",
-      label: "Add a bio (10+ characters)",
+      label: "Add a bio (15+ chars)",
       shortLabel: "Bio",
     });
   }
 
-  // 4. Location / City (15%)
+  // 4. Location / City (15% - Core)
   const location = profile?.location?.trim();
   const hasLocation = Boolean(location && location.length >= 2);
   if (hasLocation) {
     completionPercentage += 15;
     completedCount += 1;
   } else {
-    missingFields.push({
+    missingFields.push("Set your city / location");
+    missingFieldDetails.push({
       id: "location",
-      label: "Set your city or location",
+      label: "Set your city / location",
       shortLabel: "City",
     });
   }
 
-  // 5. Interests / Tags (15%)
-  const hasInterests = Boolean(Array.isArray(profile?.interests) && profile.interests.length >= 1);
+  // 5. Interests - at least 3 selected (10% - Core)
+  const interests = Array.isArray(profile?.interests) ? profile.interests : [];
+  const hasInterests = interests.length >= 3;
   if (hasInterests) {
-    completionPercentage += 15;
+    completionPercentage += 10;
     completedCount += 1;
   } else {
-    missingFields.push({
+    missingFields.push("Select 3+ interests");
+    missingFieldDetails.push({
       id: "interests",
-      label: "Select your interests",
-      shortLabel: "Interests",
+      label: "Select 3+ interests",
+      shortLabel: "3+ Interests",
     });
   }
 
-  // 6. Prompt Answer or Voice Introduction (15%)
+  // 6. 15-Second Voice Intro (10% - Enrichment)
+  const hasVoice = Boolean(profile?.voice_intro_url && profile.voice_intro_url.trim().length > 0);
+  if (hasVoice) {
+    completionPercentage += 10;
+    completedCount += 1;
+  } else {
+    missingFields.push("Record a voice intro");
+    missingFieldDetails.push({
+      id: "voice_intro",
+      label: "Record a voice intro",
+      shortLabel: "Voice Intro",
+    });
+  }
+
+  // 7. Profile Prompts (10% - Enrichment)
   const hasPrompts = Boolean(
     Array.isArray(profile?.prompts) &&
-      profile.prompts.some((p) => p && typeof p.answer === "string" && p.answer.trim().length > 0),
+      profile.prompts.some(
+        (p) => p && typeof p.answer === "string" && p.answer.trim().length >= 5,
+      ),
   );
-  const hasVoice = Boolean(profile?.voice_intro_url && profile.voice_intro_url.trim().length > 0);
-  if (hasPrompts || hasVoice) {
-    completionPercentage += 15;
+  if (hasPrompts) {
+    completionPercentage += 10;
     completedCount += 1;
   } else {
-    missingFields.push({
-      id: "prompts_or_voice",
-      label: "Answer a prompt or record voice intro",
-      shortLabel: "Prompt / Voice",
+    missingFields.push("Answer a profile prompt");
+    missingFieldDetails.push({
+      id: "prompts",
+      label: "Answer a profile prompt",
+      shortLabel: "Prompt",
     });
   }
 
+  // All 5 core fields are mandatory
+  const isCoreComplete = hasDisplayName && hasAvatar && hasBio && hasLocation && hasInterests;
+  const clampedPercentage = Math.min(100, completionPercentage);
+  const isFullyComplete = clampedPercentage >= 100;
+
   return {
-    completionPercentage: Math.min(100, completionPercentage),
-    isComplete: completionPercentage >= 100,
+    completionPercentage: clampedPercentage,
+    isCoreComplete,
+    isFullyComplete,
     missingFields,
+    missingFieldDetails,
     completedCount,
     totalCount,
   };
 }
 
+/** Alias wrapper for backwards compatibility */
+export function checkProfileCompletion(
+  profile?: Partial<GormatiProfile> | null,
+): ProfileCompletion {
+  return getProfileCompletion(profile);
+}
+
 /**
  * Automated reminder for incomplete profiles.
  * Triggers at most once every 24 hours on app launch/session load.
- * Inserts an in-app notification in public.notifications and fires a local push notification.
+ * Inserts an in-app notification in public.notifications and schedules a local push notification.
  */
 export async function checkAndTriggerProfileCompletionReminder(
   userId: string,
@@ -152,8 +214,8 @@ export async function checkAndTriggerProfileCompletionReminder(
 ): Promise<void> {
   if (!userId) return;
 
-  const completion = checkProfileCompletion(profile);
-  if (completion.isComplete) return;
+  const completion = getProfileCompletion(profile);
+  if (completion.isFullyComplete) return;
 
   const storageKey = `gormati_last_completion_reminder_${userId}`;
   try {
@@ -170,17 +232,13 @@ export async function checkAndTriggerProfileCompletionReminder(
   }
 
   try {
-    const missingSummary = completion.missingFields
-      .slice(0, 2)
-      .map((f) => f.shortLabel.toLowerCase())
-      .join(" and ");
-
     // 1. In-app notification
     await (supabase as any).from("notifications").insert({
       user_id: userId,
-      actor_name: "GorMati Team",
+      actor_name: "GorMati Community",
       type: "message",
-      content: `Your profile is ${completion.completionPercentage}% complete! Add your ${missingSummary} so other members can discover and connect with you ✨`,
+      content:
+        "Complete your GorMati profile so other members can discover all your details! ✨",
       reference_id: "profile",
       is_read: false,
     });
@@ -193,7 +251,7 @@ export async function checkAndTriggerProfileCompletionReminder(
           await Notifications.scheduleNotificationAsync({
             content: {
               title: "Complete Your GorMati Profile ✨",
-              body: `Your profile is ${completion.completionPercentage}% complete! Add your ${missingSummary} to get discovered by the community.`,
+              body: "Complete your GorMati profile so other members can discover all your details!",
               data: { url: "/(tabs)/profile" },
             },
             trigger: null,
@@ -209,4 +267,3 @@ export async function checkAndTriggerProfileCompletionReminder(
     // Non-blocking
   }
 }
-
