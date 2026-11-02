@@ -330,7 +330,7 @@ export default function SettingsScreen() {
           <Card style={styles.card}>
             <View style={styles.infoRow}>
               <Text style={[styles.infoLabel, { color: colors.secondary }]}>Version</Text>
-              <Text style={[styles.infoValue, { color: colors.text }]}>1.2.10 (Build 14)</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>1.2.11 (Build 15)</Text>
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <AppButton

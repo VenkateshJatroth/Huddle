@@ -42,11 +42,18 @@ import {
 import {
   demoDiscoverProfiles,
   fetchDiscoverProfiles,
+  fetchFullProfile,
+  type DiscoverProfile,
 } from "../../lib/gormati-profiles";
-import type { DiscoverProfile } from "../../lib/gormati-profiles";
 import { followProfile } from "../../lib/relationships";
 import { loadBlockedUserIds, subscribeToBlockedUsers } from "../../lib/safety";
 import { fetchUserStreak, type UserStreakInfo } from "../../lib/streaks";
+import {
+  checkProfileCompletion,
+  checkAndTriggerProfileCompletionReminder,
+  type ProfileCompletionResult,
+} from "../../lib/profileCompletion";
+import { ProfileCompletionBanner } from "../../components/ProfileCompletionBanner";
 import { supabase } from "../../lib/supabase";
 import { useAppColors } from "../../theme/colors";
 
@@ -72,6 +79,7 @@ export default function HomeScreen() {
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
   const [userStreak, setUserStreak] = useState<UserStreakInfo | null>(null);
+  const [profileCompletion, setProfileCompletion] = useState<ProfileCompletionResult | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -79,6 +87,13 @@ export default function HomeScreen() {
       void loadBlockedUserIds(user.id);
       void fetchUnreadNotificationCount(user.id).then(setUnreadCount);
       void fetchUserStreak(user.id).then(setUserStreak);
+      void fetchFullProfile(user.id).then((prof) => {
+        if (prof) {
+          const comp = checkProfileCompletion(prof);
+          setProfileCompletion(comp);
+          void checkAndTriggerProfileCompletionReminder(user.id, prof);
+        }
+      });
     }
     const unsubBlocked = subscribeToBlockedUsers((ids) => {
       setBlockedIds(ids);
@@ -171,15 +186,17 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [, feed, unread, streak] = await Promise.all([
+      const [, feed, unread, streak, prof] = await Promise.all([
         loadSpotlight(),
         fetchFeedPosts(feedFilter, user?.id, selectedChannel),
         user ? fetchUnreadNotificationCount(user.id) : Promise.resolve(0),
         user ? fetchUserStreak(user.id) : Promise.resolve(null),
+        user ? fetchFullProfile(user.id) : Promise.resolve(null),
       ]);
       setCommunityPosts(feed);
       setUnreadCount(unread);
       if (streak) setUserStreak(streak);
+      if (prof) setProfileCompletion(checkProfileCompletion(prof));
     } finally {
       setRefreshing(false);
     }
@@ -279,6 +296,17 @@ export default function HomeScreen() {
           Curated connections and conversations from your community.
         </Text>
       </View>
+
+      {/* Profile Completion Reminder Banner */}
+      {profileCompletion && !profileCompletion.isComplete ? (
+        <ProfileCompletionBanner
+          completion={profileCompletion}
+          onCompletePress={() =>
+            router.push({ pathname: "/(tabs)/profile", params: { edit: "true" } } as never)
+          }
+          style={{ marginBottom: 12 }}
+        />
+      ) : null}
 
       {/* Daily Streak & Community Leaderboard Widget */}
       {userStreak ? (

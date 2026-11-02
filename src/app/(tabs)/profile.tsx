@@ -31,7 +31,12 @@ import { DemoAvatar } from "../../components/DemoAvatar";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import { Icon } from "../../components/Icon";
 import { MemberProfileView } from "../../components/MemberProfileView";
+import { ProfileCompletionBanner } from "../../components/ProfileCompletionBanner";
 import { VoiceIntroCard } from "../../components/VoiceIntroCard";
+import {
+  checkProfileCompletion,
+  checkAndTriggerProfileCompletionReminder,
+} from "../../lib/profileCompletion";
 import {
   AppScreen,
   AppButton,
@@ -131,6 +136,7 @@ function draftFromProfile(profile: GormatiProfile): GormatiProfileDraft {
 
 function AuthenticatedProfileScreen({ user }: { user: User }) {
   const colors = useAppColors();
+  const params = useLocalSearchParams<{ userId?: string; id?: string; edit?: string }>();
   const [activeSection, setActiveSection] = useState<"Posts" | "Saved" | "Badges" | "About">("Posts");
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [savedPosts, setSavedPosts] = useState<PublishedPost[]>([]);
@@ -165,6 +171,26 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
   const [editText, setEditText] = useState("");
   const [editAudience, setEditAudience] = useState<PostAudience>("Everyone");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const completion = profile ? checkProfileCompletion(profile) : null;
+
+  useEffect(() => {
+    if (params.edit === "true" && profile && !isEditing) {
+      const timer = setTimeout(() => {
+        setDraft(draftFromProfile(profile));
+        setSaveError(null);
+        setSaveNotice(null);
+        setIsEditing(true);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [params.edit, profile, isEditing]);
+
+  useEffect(() => {
+    if (profile) {
+      void checkAndTriggerProfileCompletionReminder(user.id, profile);
+    }
+  }, [user.id, profile]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -518,6 +544,14 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
           </LocalPreviewNotice>
           <AppButton label="Retry" variant="outline" onPress={retryProfileLoad} />
         </View>
+      ) : null}
+
+      {profile && completion && !completion.isComplete ? (
+        <ProfileCompletionBanner
+          completion={completion}
+          onCompletePress={startEditing}
+          style={{ marginBottom: 14 }}
+        />
       ) : null}
 
       {profile ? (
