@@ -329,6 +329,14 @@ export default function HomeScreen() {
       <View style={styles.filterRow}>
         <ChoiceChip label="For you" selected={feedFilter === "For you"} onPress={() => setFeedFilter("For you")} />
         <ChoiceChip label="Following" selected={feedFilter === "Following"} onPress={() => setFeedFilter("Following")} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Explore local meetups and events"
+          onPress={() => router.push("/events" as never)}
+          style={[styles.eventsBadgeBtn, { backgroundColor: colors.accentSoft }]}
+        >
+          <Text style={[styles.eventsBadgeText, { color: colors.accent }]}>Meetups 📍</Text>
+        </Pressable>
         <View style={styles.filterHint}>
           <Icon name="globe" color={colors.secondary} size={15} />
           <Text style={[styles.filterHintText, { color: colors.secondary }]}>India</Text>
@@ -599,5 +607,16 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: "center",
     paddingHorizontal: 8,
+  },
+  eventsBadgeBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  eventsBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

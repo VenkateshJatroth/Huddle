@@ -86,3 +86,4 @@ WHERE username ILIKE '%sumear%' OR display_name ILIKE '%sumear%';
 UPDATE public.profiles
 SET current_streak = 1, longest_streak = 1, total_posts = 2, last_post_date = CURRENT_DATE
 WHERE username ILIKE '%8125%' OR display_name ILIKE '%8125%';
+

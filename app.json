@@ -55,7 +55,8 @@
         }
       ],
       "expo-web-browser",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-audio"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

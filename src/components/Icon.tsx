@@ -17,11 +17,13 @@ export type AppIconName =
   | "check"
   | "chevronRight"
   | "chevronLeft"
+  | "arrowBack"
   | "location"
   | "language"
   | "more"
   | "close"
   | "send"
+  | "bookmark"
   | "settings";
 
 const iconNames = {
@@ -40,11 +42,13 @@ const iconNames = {
   check: { ios: "checkmark", android: "check", web: "check" },
   chevronRight: { ios: "chevron.right", android: "chevron_right", web: "chevron_right" },
   chevronLeft: { ios: "chevron.left", android: "arrow_back", web: "arrow_back" },
+  arrowBack: { ios: "chevron.left", android: "arrow_back", web: "arrow_back" },
   location: { ios: "mappin.and.ellipse", android: "location_on", web: "location_on" },
   language: { ios: "character.bubble", android: "translate", web: "translate" },
   more: { ios: "ellipsis", android: "more_horiz", web: "more_horiz" },
   close: { ios: "xmark", android: "close", web: "close" },
   send: { ios: "paperplane", android: "send", web: "send" },
+  bookmark: { ios: "bookmark", android: "bookmark", web: "bookmark" },
   settings: { ios: "gearshape", android: "settings", web: "settings" },
 } satisfies Record<AppIconName, SymbolViewProps["name"]>;
 

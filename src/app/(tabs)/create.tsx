@@ -25,6 +25,7 @@ import {
   type CommunityChannel,
   type PostAudience,
 } from "../../lib/posts";
+import { AudioRecorderSection } from "../../components/AudioRecorderSection";
 import { useAppColors } from "../../theme/colors";
 
 const audiences = ["Everyone", "Connections", "Only me"] as const;
@@ -37,6 +38,11 @@ export default function CreateScreen() {
   const [audience, setAudience] = useState<PostAudience>("Everyone");
   const [channel, setChannel] = useState<CommunityChannel>("General");
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [audioUri, setAudioUri] = useState<string | null>(null);
+  const [audioDuration, setAudioDuration] = useState<number>(0);
+  const [showPollCreator, setShowPollCreator] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
 
@@ -78,6 +84,8 @@ export default function CreateScreen() {
       const authorName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Gormati Member";
       const username = user.user_metadata?.username || user.email?.split("@")[0] || "member";
 
+      const validPollOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
+
       await createPost({
         authorId: user.id,
         authorName,
@@ -86,10 +94,22 @@ export default function CreateScreen() {
         audience,
         channel,
         localImageUri: selectedImageUri,
+        localAudioUri: audioUri,
+        audioDuration: audioUri ? audioDuration : null,
+        pollQuestion: showPollCreator && pollQuestion.trim() ? pollQuestion.trim() : null,
+        pollOptions:
+          showPollCreator && pollQuestion.trim() && validPollOptions.length >= 2
+            ? validPollOptions
+            : null,
       });
 
       setDraft("");
       setSelectedImageUri(null);
+      setAudioUri(null);
+      setAudioDuration(0);
+      setShowPollCreator(false);
+      setPollQuestion("");
+      setPollOptions(["", ""]);
       setPreviewVisible(false);
 
       Alert.alert(
@@ -135,6 +155,20 @@ export default function CreateScreen() {
           style={[styles.textArea, { color: colors.text, backgroundColor: colors.subtle, borderColor: colors.border }]}
         />
 
+        {/* Audio Voice Note Recording Section */}
+        <AudioRecorderSection
+          audioUri={audioUri}
+          audioDuration={audioDuration}
+          onAudioRecorded={(uri, dur) => {
+            setAudioUri(uri);
+            setAudioDuration(dur);
+          }}
+          onRemoveAudio={() => {
+            setAudioUri(null);
+            setAudioDuration(0);
+          }}
+        />
+
         {/* Photo Attachment Bar */}
         <View style={[styles.attachmentRow, { borderColor: colors.border }]}>
           <AppButton
@@ -169,6 +203,85 @@ export default function CreateScreen() {
             />
           </View>
         ) : null}
+      </Card>
+
+      {/* Interactive Poll Creator Card */}
+      <Card style={[styles.pollCreatorCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={styles.pollCreatorHeader}>
+          <View style={styles.pollCreatorTitleWrap}>
+            <Text style={styles.pollTagEmoji}>📊</Text>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Community Poll</Text>
+          </View>
+          <AppButton
+            label={showPollCreator ? "Remove Poll" : "+ Add Poll"}
+            variant="outline"
+            onPress={() => {
+              if (showPollCreator) {
+                setPollQuestion("");
+                setPollOptions(["", ""]);
+              }
+              setShowPollCreator(!showPollCreator);
+            }}
+          />
+        </View>
+
+        {showPollCreator ? (
+          <View style={styles.pollInputsWrap}>
+            <TextInput
+              placeholder="Ask a question (e.g. Best weekend spot in Dubai?)"
+              placeholderTextColor={colors.secondary}
+              value={pollQuestion}
+              onChangeText={setPollQuestion}
+              style={[
+                styles.pollInput,
+                { color: colors.text, backgroundColor: colors.subtle, borderColor: colors.border },
+              ]}
+            />
+            {pollOptions.map((opt, idx) => (
+              <View key={idx} style={styles.pollOptionRow}>
+                <TextInput
+                  placeholder={`Choice ${idx + 1}`}
+                  placeholderTextColor={colors.secondary}
+                  value={opt}
+                  onChangeText={(val) => {
+                    const copy = [...pollOptions];
+                    copy[idx] = val;
+                    setPollOptions(copy);
+                  }}
+                  style={[
+                    styles.pollInput,
+                    { flex: 1, color: colors.text, backgroundColor: colors.subtle, borderColor: colors.border },
+                  ]}
+                />
+                {pollOptions.length > 2 ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove choice ${idx + 1}`}
+                    onPress={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                    hitSlop={6}
+                    style={styles.removeOptionBtn}
+                  >
+                    <Icon name="close" color={colors.secondary} size={18} />
+                  </Pressable>
+                ) : null}
+              </View>
+            ))}
+            {pollOptions.length < 4 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Add another choice"
+                onPress={() => setPollOptions([...pollOptions, ""])}
+                style={styles.addOptionBtn}
+              >
+                <Text style={[styles.addOptionText, { color: colors.accent }]}>+ Add another choice</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : (
+          <Text style={[styles.helperText, { color: colors.secondary }]}>
+            Engage your community circle with an interactive question and voting choices.
+          </Text>
+        )}
       </Card>
 
       {/* Community Circle / Topic Channel Selection */}
@@ -265,4 +378,14 @@ const styles = StyleSheet.create({
   previewEyebrow: { fontSize: 11, letterSpacing: 0.5, fontWeight: "800" },
   previewText: { fontSize: 14, lineHeight: 22 },
   previewImage: { width: "100%", height: 160, borderRadius: 10, borderWidth: 1, marginTop: 4 },
+  pollCreatorCard: { gap: 10, padding: 14, borderRadius: 14 },
+  pollCreatorHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  pollCreatorTitleWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
+  pollTagEmoji: { fontSize: 16 },
+  pollInputsWrap: { gap: 8, marginTop: 4 },
+  pollInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13 },
+  pollOptionRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  removeOptionBtn: { padding: 4 },
+  addOptionBtn: { paddingVertical: 6 },
+  addOptionText: { fontSize: 13, fontWeight: "700" },
 });

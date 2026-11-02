@@ -351,3 +351,4 @@ const styles = StyleSheet.create({
   streakPillText: { fontSize: 12, fontWeight: "700" },
   postsMetaText: { fontSize: 10 },
 });
+

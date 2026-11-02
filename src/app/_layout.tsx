@@ -58,6 +58,7 @@ function RootNavigator() {
         <Stack.Screen name="notifications" options={{ presentation: "card" }} />
         <Stack.Screen name="discover" options={{ presentation: "card" }} />
         <Stack.Screen name="leaderboard" options={{ presentation: "card" }} />
+        <Stack.Screen name="events" options={{ presentation: "card" }} />
       </Stack>
     </View>
   );

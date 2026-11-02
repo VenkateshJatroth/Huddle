@@ -21,6 +21,11 @@ import {
   type PublishedPost,
 } from "../lib/posts";
 import { useAuth } from "../auth/AuthProvider";
+import { AudioPlayerCard } from "./AudioPlayerCard";
+import { PollCard } from "./PollCard";
+import { getUserBadges } from "../lib/badges";
+import { UserBadge } from "./UserBadge";
+import { fetchSavedPostIds, toggleSavedPost } from "../lib/bookmarks";
 
 export function FeedPostCard({
   post,
@@ -54,6 +59,33 @@ export function FeedPostCard({
   const [replyText, setReplyText] = useState("");
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
   const [repliesCount, setRepliesCount] = useState(post.replies || 0);
+
+  // Bookmarks state
+  const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    if (currentUserId) {
+      void fetchSavedPostIds(currentUserId).then((ids) => {
+        setIsSaved(ids.has(post.id));
+      });
+    }
+  }, [currentUserId, post.id]);
+
+  const handleToggleBookmark = async () => {
+    if (!currentUserId) {
+      Alert.alert("Sign In Required", "Please sign in to save bookmarks.");
+      return;
+    }
+    const nextSaved = await toggleSavedPost(currentUserId, post.id, isSaved);
+    setIsSaved(nextSaved);
+  };
+
+  const authorBadges = getUserBadges({
+    currentStreak: post.author === "Venky" ? 4 : 2,
+    totalPosts: post.author === "Venky" ? 6 : 1,
+    isVerified: true,
+  });
+  const topBadge = authorBadges[0];
 
   useEffect(() => {
     if (showReplies) {
@@ -170,6 +202,7 @@ export function FeedPostCard({
         <View style={styles.authorDetails}>
           <View style={[rowStyles.row, styles.nameLine]}>
             <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>{post.author}</Text>
+            {topBadge ? <UserBadge badge={topBadge} compact /> : null}
             <Text style={[styles.metaText, { color: colors.secondary }]}>· {post.time}</Text>
           </View>
           <Text style={[styles.metaText, { color: colors.secondary }]}>@{post.username}</Text>
@@ -186,6 +219,22 @@ export function FeedPostCard({
       </View>
 
       <Text style={[styles.postText, { color: colors.text }]}>{post.text}</Text>
+
+      {publishedPost.audio_url ? (
+        <AudioPlayerCard
+          audioUrl={publishedPost.audio_url}
+          durationSeconds={publishedPost.audio_duration || 24}
+        />
+      ) : null}
+
+      {publishedPost.poll_question && publishedPost.poll_options && publishedPost.poll_options.length > 0 ? (
+        <PollCard
+          postId={publishedPost.id}
+          question={publishedPost.poll_question}
+          options={publishedPost.poll_options}
+          currentUserId={currentUserId}
+        />
+      ) : null}
 
       {mediaSource ? (
         <Image
@@ -253,6 +302,15 @@ export function FeedPostCard({
           style={[styles.actionButton, styles.shareButton]}
         >
           <Icon name="share" color={colors.secondary} size={18} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isSaved ? "Remove bookmark" : "Save bookmark"}
+          onPress={() => { void handleToggleBookmark(); }}
+          hitSlop={5}
+          style={styles.actionButton}
+        >
+          <Icon name="bookmark" color={isSaved ? colors.accent : colors.secondary} size={18} />
         </Pressable>
       </View>
 

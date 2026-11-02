@@ -30,6 +30,10 @@ export type PostDraft = {
   audience: PostAudience;
   channel?: CommunityChannel;
   localImageUri?: string | null;
+  localAudioUri?: string | null;
+  audioDuration?: number | null;
+  pollQuestion?: string | null;
+  pollOptions?: string[] | null;
   location?: string;
 };
 
@@ -38,6 +42,10 @@ export type PublishedPost = CommunityPost & {
   audience?: PostAudience;
   channel?: CommunityChannel;
   image_url?: string | null;
+  audio_url?: string | null;
+  audio_duration?: number | null;
+  poll_question?: string | null;
+  poll_options?: string[] | null;
   created_at: string;
 };
 
@@ -171,6 +179,10 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
     audience: draft.audience,
     channel: draft.channel || "General",
     image_url: remoteImageUrl,
+    audio_url: draft.localAudioUri || null,
+    audio_duration: draft.audioDuration || null,
+    poll_question: draft.pollQuestion || null,
+    poll_options: draft.pollOptions || null,
     created_at: nowIso,
   };
 
@@ -189,6 +201,10 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
       audience: draft.audience,
       channel: draft.channel || "General",
       image_url: remoteImageUrl,
+      audio_url: draft.localAudioUri || null,
+      audio_duration: draft.audioDuration || null,
+      poll_question: draft.pollQuestion || null,
+      poll_options: draft.pollOptions || null,
       created_at: nowIso,
     });
   } catch {
@@ -396,6 +412,10 @@ export async function fetchFeedPosts(
         audience: row.audience,
         channel: row.channel || "General",
         image_url: row.image_url,
+        audio_url: row.audio_url,
+        audio_duration: row.audio_duration,
+        poll_question: row.poll_question,
+        poll_options: row.poll_options,
         created_at: row.created_at,
       }));
     }
@@ -477,6 +497,10 @@ export async function fetchUserPosts(userId: string): Promise<PublishedPost[]> {
         audience: row.audience,
         channel: row.channel || "General",
         image_url: row.image_url,
+        audio_url: row.audio_url,
+        audio_duration: row.audio_duration,
+        poll_question: row.poll_question,
+        poll_options: row.poll_options,
         created_at: row.created_at,
       }));
 

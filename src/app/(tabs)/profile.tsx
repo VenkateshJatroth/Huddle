@@ -51,6 +51,8 @@ import {
   type PostAudience,
   type PublishedPost,
 } from "../../lib/posts";
+import { BADGE_DEFINITIONS, getUserBadges } from "../../lib/badges";
+import { fetchSavedPosts } from "../../lib/bookmarks";
 import { profilePosts } from "../../data/mockData";
 import { demoProfilePostDescriptions, demoProfilePostImages } from "../../data/mockMedia";
 import {
@@ -121,8 +123,9 @@ function draftFromProfile(profile: GormatiProfile): GormatiProfileDraft {
 
 function AuthenticatedProfileScreen({ user }: { user: User }) {
   const colors = useAppColors();
-  const [activeSection, setActiveSection] = useState<"Posts" | "About">("Posts");
+  const [activeSection, setActiveSection] = useState<"Posts" | "Saved" | "Badges" | "About">("Posts");
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+  const [savedPosts, setSavedPosts] = useState<PublishedPost[]>([]);
   const [profile, setProfile] = useState<GormatiProfile | null>(null);
   const [loadState, setLoadState] = useState<ProfileLoadState>("loading");
   const [reloadKey, setReloadKey] = useState(0);
@@ -175,6 +178,25 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
       unsubscribe();
     };
   }, [user]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    async function loadBookmarks() {
+      try {
+        const posts = await fetchSavedPosts(user.id);
+        if (!isCurrent) return;
+        setSavedPosts(posts);
+      } catch {
+        // Fallback
+      }
+    }
+    if (activeSection === "Saved") {
+      void loadBookmarks();
+    }
+    return () => {
+      isCurrent = false;
+    };
+  }, [user.id, activeSection]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -801,6 +823,8 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
 
       <View style={styles.tabs}>
         <ChoiceChip label="Posts" selected={activeSection === "Posts"} onPress={() => setActiveSection("Posts")} />
+        <ChoiceChip label="Saved" selected={activeSection === "Saved"} onPress={() => setActiveSection("Saved")} />
+        <ChoiceChip label="Badges" selected={activeSection === "Badges"} onPress={() => setActiveSection("Badges")} />
         <ChoiceChip label="About" selected={activeSection === "About"} onPress={() => setActiveSection("About")} />
       </View>
 
@@ -838,6 +862,101 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
             />
           ))}
         </>
+      ) : activeSection === "Saved" ? (
+        <View style={{ gap: 12 }}>
+          <SectionHeading title="Saved Bookmarks" />
+          {savedPosts.length > 0 ? (
+            savedPosts.map((post) => (
+              <FeedPostCard
+                key={post.id}
+                post={post}
+                liked={Boolean(likedPosts[post.id])}
+                mediaSource={post.image_url ? { uri: post.image_url } : undefined}
+                currentUserId={user.id}
+                onToggleLike={() => setLikedPosts((current) => ({ ...current, [post.id]: !current[post.id] }))}
+                onEditPost={handleOpenEdit}
+                onDeletePost={handleDeletePost}
+              />
+            ))
+          ) : (
+            <Card style={[styles.emptySavedCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Icon name="bookmark" color={colors.accent} size={30} />
+              <Text style={[styles.emptySavedTitle, { color: colors.text }]}>No saved posts yet</Text>
+              <Text style={[styles.emptySavedSub, { color: colors.secondary }]}>
+                Tap the bookmark icon on any post in your community feed to save it for quick reference later.
+              </Text>
+            </Card>
+          )}
+        </View>
+      ) : activeSection === "Badges" ? (
+        <View style={{ gap: 12 }}>
+          <SectionHeading title="Achievements & Roles" />
+          <Card style={[styles.badgesContainerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.badgesSummary, { color: colors.secondary }]}>
+              Badges are automatically unlocked as you maintain posting streaks, contribute to circles, and attend meetups.
+            </Text>
+
+            <View style={styles.badgeList}>
+              {Object.values(BADGE_DEFINITIONS).map((badge) => {
+                const userBadges = getUserBadges({
+                  currentStreak: (profile as any)?.current_streak ?? 1,
+                  longestStreak: (profile as any)?.longest_streak ?? 1,
+                  totalPosts: (profile as any)?.total_posts ?? userCreatedPosts.length,
+                  isVerified: true,
+                });
+                const isUnlocked = userBadges.some((b) => b.id === badge.id);
+
+                return (
+                  <View
+                    key={badge.id}
+                    style={[
+                      styles.badgeItemRow,
+                      {
+                        backgroundColor: isUnlocked ? colors.subtle : colors.surface,
+                        borderColor: isUnlocked ? colors.accentSoft : colors.border,
+                        opacity: isUnlocked ? 1 : 0.6,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.badgeIconCircle,
+                        { backgroundColor: isUnlocked ? badge.bgLight : colors.border },
+                      ]}
+                    >
+                      <Text style={styles.badgeIconEmoji}>{badge.emoji}</Text>
+                    </View>
+                    <View style={styles.badgeItemTextWrap}>
+                      <View style={styles.badgeNameRow}>
+                        <Text style={[styles.badgeItemName, { color: colors.text }]}>
+                          {badge.name}
+                        </Text>
+                        <View
+                          style={[
+                            styles.badgeStatusPill,
+                            { backgroundColor: isUnlocked ? "#DCFCE7" : colors.subtle },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.badgeStatusText,
+                              { color: isUnlocked ? "#15803D" : colors.secondary },
+                            ]}
+                          >
+                            {isUnlocked ? "UNLOCKED" : "LOCKED"}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.badgeItemDesc, { color: colors.secondary }]}>
+                        {badge.description}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </Card>
+        </View>
       ) : (
         <Card style={styles.aboutCard}>
           <SectionHeading title="About · sample" />
@@ -1107,5 +1226,79 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 10,
     marginTop: 6,
+  },
+  emptySavedCard: {
+    padding: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderRadius: 16,
+  },
+  emptySavedTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  emptySavedSub: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+  },
+  badgesContainerCard: {
+    padding: 16,
+    borderRadius: 16,
+    gap: 14,
+  },
+  badgesSummary: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  badgeList: {
+    gap: 10,
+  },
+  badgeItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  badgeIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeIconEmoji: {
+    fontSize: 22,
+  },
+  badgeItemTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  badgeNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  badgeItemName: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  badgeStatusPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  badgeStatusText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  badgeItemDesc: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 });
