@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Image, type ImageSource } from "expo-image";
+import { router } from "expo-router";
 import { useAppColors } from "../theme/colors";
 import type { CommunityPost } from "../data/mockData";
 import { Icon } from "./Icon";
@@ -37,6 +38,7 @@ export function FeedPostCard({
   currentUserId,
   onEditPost,
   onDeletePost,
+  onAuthorPress,
 }: {
   post: CommunityPost | PublishedPost;
   liked?: boolean;
@@ -47,11 +49,30 @@ export function FeedPostCard({
   currentUserId?: string;
   onEditPost?: (post: PublishedPost) => void;
   onDeletePost?: (post: PublishedPost) => void;
+  onAuthorPress?: () => void;
 }) {
   const colors = useAppColors();
   const { user } = useAuth();
   const publishedPost = post as PublishedPost;
   const isAuthor = Boolean(currentUserId && publishedPost.author_id === currentUserId);
+
+  const handleAuthorPress = () => {
+    if (onAuthorPress) {
+      onAuthorPress();
+      return;
+    }
+    const authorId = publishedPost.author_id;
+    if (authorId) {
+      if (currentUserId && authorId === currentUserId) {
+        router.push("/(tabs)/profile" as never);
+      } else {
+        router.push({
+          pathname: "/(tabs)/profile",
+          params: { userId: authorId },
+        } as never);
+      }
+    }
+  };
 
   // Replies drawer state
   const [showReplies, setShowReplies] = useState(false);
@@ -194,19 +215,26 @@ export function FeedPostCard({
   return (
     <Card style={styles.postCard}>
       <View style={[rowStyles.row, styles.authorRow]}>
-        {demoAvatarId ? (
-          <DemoAvatar id={demoAvatarId} name={post.author} tone={post.tone} />
-        ) : (
-          <Avatar name={post.author} tone={post.tone} />
-        )}
-        <View style={styles.authorDetails}>
-          <View style={[rowStyles.row, styles.nameLine]}>
-            <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>{post.author}</Text>
-            {topBadge ? <UserBadge badge={topBadge} compact /> : null}
-            <Text style={[styles.metaText, { color: colors.secondary }]}>· {post.time}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`View ${post.author}'s profile`}
+          onPress={handleAuthorPress}
+          style={styles.authorPressable}
+        >
+          {demoAvatarId ? (
+            <DemoAvatar id={demoAvatarId} name={post.author} tone={post.tone} />
+          ) : (
+            <Avatar name={post.author} tone={post.tone} />
+          )}
+          <View style={styles.authorDetails}>
+            <View style={[rowStyles.row, styles.nameLine]}>
+              <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>{post.author}</Text>
+              {topBadge ? <UserBadge badge={topBadge} compact /> : null}
+              <Text style={[styles.metaText, { color: colors.secondary }]}>· {post.time}</Text>
+            </View>
+            <Text style={[styles.metaText, { color: colors.secondary }]}>@{post.username}</Text>
           </View>
-          <Text style={[styles.metaText, { color: colors.secondary }]}>@{post.username}</Text>
-        </View>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`More options for ${post.author}'s post`}
@@ -373,6 +401,13 @@ export function FeedPostCard({
 const styles = StyleSheet.create({
   postCard: { padding: 16, gap: 13 },
   authorRow: { alignItems: "center", gap: 11 },
+  authorPressable: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    minWidth: 0,
+  },
   authorDetails: { flex: 1, minWidth: 0, gap: 3 },
   nameLine: { flexWrap: "wrap", gap: 5 },
   authorName: { fontSize: 14, fontWeight: "700", flexShrink: 1 },

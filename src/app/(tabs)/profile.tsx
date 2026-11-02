@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import type { User } from "@supabase/supabase-js";
 import {
@@ -30,6 +30,7 @@ import { useAuth } from "../../auth/AuthProvider";
 import { DemoAvatar } from "../../components/DemoAvatar";
 import { FeedPostCard } from "../../components/FeedPostCard";
 import { Icon } from "../../components/Icon";
+import { MemberProfileView } from "../../components/MemberProfileView";
 import { VoiceIntroCard } from "../../components/VoiceIntroCard";
 import {
   AppScreen,
@@ -87,6 +88,13 @@ const sampleProfile = {
 
 export default function ProfileScreen() {
   const { user } = useAuth();
+  const params = useLocalSearchParams<{ userId?: string; id?: string }>();
+  const targetUserId = params.userId || params.id;
+
+  // If a specific userId is passed and it's NOT the signed-in user, view their member profile
+  if (targetUserId && (!user || targetUserId !== user.id)) {
+    return <MemberProfileView memberId={targetUserId} />;
+  }
 
   if (!user) {
     return (
