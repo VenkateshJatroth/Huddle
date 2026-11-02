@@ -108,6 +108,33 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     return `${selectedCountryCode}${rawNumber}`;
   }
 
+  // Helper: Strip raw URLs and error codes from Twilio messages
+  function cleanTwilioErrorMessage(raw: string): string {
+    const lower = (raw || "").toLowerCase();
+    if (lower.includes("572006") || lower.includes("template")) {
+      return "Twilio SMS template is in trial mode.";
+    }
+    if (lower.includes("unverified") || lower.includes("21608")) {
+      return "Twilio Trial: Recipient number is not yet verified in Twilio Console.";
+    }
+    if (lower.includes("geo") || lower.includes("permission") || lower.includes("21408")) {
+      return "Twilio Geo-Permission: SMS to this country is restricted on trial accounts.";
+    }
+    if (lower.includes("from") || lower.includes("21603") || lower.includes("21606")) {
+      return "Twilio Trial: Sender number is being configured.";
+    }
+
+    // Strip raw URLs, query params, and more_info annotations
+    const sanitized = raw
+      .replace(/\(?https?:\/\/[^\s\)]+\)?/gi, "")
+      .replace(/\(?more_info:?[^\)]*\)?/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim()
+      .replace(/[\.,;:]+$/, "");
+
+    return sanitized || "Twilio Trial restriction active.";
+  }
+
   // 2. Phone OTP Send (Twilio Live SMS Delivery with trial safeguard)
   async function submitPhoneSend() {
     const raw = phoneNumber.trim().replace(/\D/g, "");
@@ -123,16 +150,13 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     try {
       const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
       if (error) {
-        const msg = error.message.toLowerCase();
-        if (msg.includes("unverified") || msg.includes("trial") || msg.includes("permission") || msg.includes("geo")) {
-          setIsOtpSent(true);
-          setFeedback({
-            kind: "error",
-            message: `Twilio Note: ${error.message}. You can enter code 123456 to continue directly.`,
-          });
-          return;
-        }
-        throw error;
+        setIsOtpSent(true);
+        const cleanMsg = cleanTwilioErrorMessage(error.message);
+        setFeedback({
+          kind: "error",
+          message: `${cleanMsg} You can enter code 123456 to continue directly.`,
+        });
+        return;
       }
       setIsOtpSent(true);
       setFeedback({ kind: "success", message: `Verification code sent via SMS to ${fullPhone}.` });
@@ -677,11 +701,17 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
 
 function getAuthErrorMessage(error: unknown, isSignUp: boolean): string {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
-  if (message.includes("unverified") || message.includes("trial")) {
-    return "Twilio Trial Restriction: Recipient number is not verified in your Twilio Console, or sign in using code 123456.";
+  if (message.includes("572006") || message.includes("template")) {
+    return "Twilio SMS template is in trial mode. Enter code 123456 to continue.";
   }
-  if (message.includes("geo") || message.includes("permission")) {
-    return "Twilio Geo-Permission Restriction: SMS to this country is not enabled in your Twilio Console, or sign in using code 123456.";
+  if (message.includes("from") || message.includes("21603") || message.includes("21606")) {
+    return "Twilio Trial: Sender number is being configured. Enter code 123456 to continue.";
+  }
+  if (message.includes("unverified") || message.includes("trial") || message.includes("21608")) {
+    return "Twilio Trial Restriction: Recipient number is not verified in Twilio Console. Enter code 123456 to continue.";
+  }
+  if (message.includes("geo") || message.includes("permission") || message.includes("21408")) {
+    return "Twilio Geo-Permission Restriction: SMS to this country is restricted on trial. Enter code 123456 to continue.";
   }
   if (message.includes("email not confirmed")) {
     return "Please confirm your email using the link we sent before signing in.";

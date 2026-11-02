@@ -200,7 +200,17 @@ export function AppButton({
   const textOnly = variant === "text";
   const backgroundColor = filled ? colors.accent : subtle ? colors.subtle : "transparent";
   const borderColor = variant === "outline" ? colors.border : "transparent";
-  const foreground = filled ? "#FFFFFF" : variant === "text" ? colors.accent : colors.text;
+  const isAccentWhite =
+    colors.accent.toUpperCase() === "#FFFFFF" ||
+    colors.accent.toLowerCase() === "#fff" ||
+    colors.accent.toLowerCase() === "white";
+  const foreground = filled
+    ? isAccentWhite
+      ? "#09090B"
+      : "#FFFFFF"
+    : variant === "text"
+      ? colors.accent
+      : colors.text;
 
   return (
     <Pressable
@@ -218,7 +228,15 @@ export function AppButton({
       ]}
     >
       {icon ? <Icon name={icon} color={foreground} size={17} /> : null}
-      <Text style={[styles.buttonText, { color: foreground }, textOnly ? styles.textButtonLabel : null]}>{label}</Text>
+      <Text
+        style={[
+          styles.buttonText,
+          { color: foreground, fontWeight: filled && isAccentWhite ? "700" : "600" },
+          textOnly ? styles.textButtonLabel : null,
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -235,11 +253,29 @@ export function ChoiceChip({
   icon?: AppIconName;
 }) {
   const colors = useAppColors();
-  const chipForeground = selected ? "#FFFFFF" : colors.secondary;
+  const isSelectedBgWhite =
+    colors.accent.toUpperCase() === "#FFFFFF" ||
+    colors.accent.toLowerCase() === "#fff" ||
+    colors.accent.toLowerCase() === "white";
+  const chipForeground = selected
+    ? isSelectedBgWhite
+      ? "#09090B"
+      : "#FFFFFF"
+    : colors.secondary;
   const content = (
     <>
       {icon ? <Icon name={icon} color={chipForeground} size={15} /> : null}
-      <Text style={[styles.chipText, { color: chipForeground }]}>{label}</Text>
+      <Text
+        style={[
+          styles.chipText,
+          {
+            color: chipForeground,
+            fontWeight: selected ? "700" : "600",
+          },
+        ]}
+      >
+        {label}
+      </Text>
     </>
   );
 
