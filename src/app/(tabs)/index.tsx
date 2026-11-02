@@ -25,7 +25,6 @@ import {
   rowStyles,
   SectionHeading,
 } from "../../components/ui";
-import { samplePosts } from "../../data/mockData";
 import {
   COMMUNITY_CHANNELS,
   deletePost,
@@ -47,6 +46,7 @@ import {
 import type { DiscoverProfile } from "../../lib/gormati-profiles";
 import { followProfile } from "../../lib/relationships";
 import { loadBlockedUserIds, subscribeToBlockedUsers } from "../../lib/safety";
+import { fetchUserStreak, type UserStreakInfo } from "../../lib/streaks";
 import { supabase } from "../../lib/supabase";
 import { useAppColors } from "../../theme/colors";
 
@@ -71,12 +71,14 @@ export default function HomeScreen() {
   const [passedProfileIds, setPassedProfileIds] = useState<Record<string, boolean>>({});
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const [userStreak, setUserStreak] = useState<UserStreakInfo | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
       void loadBlockedUserIds(user.id);
       void fetchUnreadNotificationCount(user.id).then(setUnreadCount);
+      void fetchUserStreak(user.id).then(setUserStreak);
     }
     const unsubBlocked = subscribeToBlockedUsers((ids) => {
       setBlockedIds(ids);
@@ -169,13 +171,15 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [, feed, unread] = await Promise.all([
+      const [, feed, unread, streak] = await Promise.all([
         loadSpotlight(),
         fetchFeedPosts(feedFilter, user?.id, selectedChannel),
         user ? fetchUnreadNotificationCount(user.id) : Promise.resolve(0),
+        user ? fetchUserStreak(user.id) : Promise.resolve(null),
       ]);
       setCommunityPosts(feed);
       setUnreadCount(unread);
+      if (streak) setUserStreak(streak);
     } finally {
       setRefreshing(false);
     }
@@ -227,9 +231,6 @@ export default function HomeScreen() {
     .filter((p) => !likedProfileIds[p.id])
     .filter((p) => !passedProfileIds[p.id])
     .filter((p) => !blockedIds.includes(p.id));
-  const visiblePosts = feedFilter === "For you"
-    ? samplePosts
-    : samplePosts.filter((post) => post.id === "post-bengaluru-cycling");
 
   const userGreetingName = user?.email ? user.email.split("@")[0] : "Member";
 
@@ -278,6 +279,32 @@ export default function HomeScreen() {
           Curated connections and conversations from your community.
         </Text>
       </View>
+
+      {/* Daily Streak & Community Leaderboard Widget */}
+      {userStreak ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="View Community Leaderboard"
+          onPress={() => router.push("/leaderboard" as never)}
+        >
+          <Card style={[styles.streakWidgetCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.streakWidgetLeft}>
+              <Text style={styles.streakWidgetFlame}>🔥</Text>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={[styles.streakWidgetTitle, { color: colors.text }]}>
+                  {userStreak.currentStreak > 0 ? `${userStreak.currentStreak} Day Posting Streak!` : "Daily Streak"}
+                </Text>
+                <Text style={[styles.streakWidgetSub, { color: colors.secondary }]}>
+                  {userStreak.postedToday ? "Streak protected today! Great job" : "Post today to keep your streak going"}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.streakWidgetBadge, { backgroundColor: colors.accentSoft }]}>
+              <Text style={[styles.streakWidgetBadgeText, { color: colors.accent }]}>Leaderboard 🏆</Text>
+            </View>
+          </Card>
+        </Pressable>
+      ) : null}
 
       {/* Featured Gormati Members Spotlight */}
       {visibleSpotlight.length > 0 ? (
@@ -366,19 +393,36 @@ export default function HomeScreen() {
       </Card>
 
       <SectionHeading title="Community feed" />
-      {(communityPosts.length > 0 ? communityPosts : (visiblePosts as PublishedPost[])).map((post) => (
-        <FeedPostCard
-          key={post.id}
-          post={post}
-          liked={Boolean(likedPosts[post.id])}
-          demoAvatarId={post.id}
-          mediaSource={post.image_url ? { uri: post.image_url } : undefined}
-          currentUserId={user?.id}
-          onToggleLike={() => setLikedPosts((current) => ({ ...current, [post.id]: !current[post.id] }))}
-          onEditPost={handleOpenEdit}
-          onDeletePost={handleDeletePost}
-        />
-      ))}
+      {communityPosts.length > 0 ? (
+        communityPosts.map((post) => (
+          <FeedPostCard
+            key={post.id}
+            post={post}
+            liked={Boolean(likedPosts[post.id])}
+            demoAvatarId={post.id}
+            mediaSource={post.image_url ? { uri: post.image_url } : undefined}
+            currentUserId={user?.id}
+            onToggleLike={() => setLikedPosts((current) => ({ ...current, [post.id]: !current[post.id] }))}
+            onEditPost={handleOpenEdit}
+            onDeletePost={handleDeletePost}
+          />
+        ))
+      ) : (
+        <Card style={[styles.emptyFeedCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Icon name="sparkles" color={colors.accent} size={30} />
+          <Text style={[styles.emptyFeedTitle, { color: colors.text }]}>No posts yet in this circle</Text>
+          <Text style={[styles.emptyFeedSub, { color: colors.secondary }]}>
+            Be the first member to share an update, photo, or conversation with the community!
+          </Text>
+          <View style={{ marginTop: 6 }}>
+            <AppButton
+              label="Create First Post"
+              variant="primary"
+              onPress={() => router.push("/create")}
+            />
+          </View>
+        </Card>
+      )}
 
       {/* Edit Post Modal */}
       <Modal
@@ -504,5 +548,56 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 10,
     marginTop: 6,
+  },
+  streakWidgetCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    gap: 12,
+  },
+  streakWidgetLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  streakWidgetFlame: {
+    fontSize: 26,
+  },
+  streakWidgetTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  streakWidgetSub: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  streakWidgetBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  streakWidgetBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  emptyFeedCard: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    gap: 10,
+    textAlign: "center",
+  },
+  emptyFeedTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  emptyFeedSub: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+    paddingHorizontal: 8,
   },
 });

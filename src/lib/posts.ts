@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { uploadProfileImage } from "./gormati-profiles";
+import { recordUserStreak } from "./streaks";
 import { samplePosts, type CommunityPost } from "../data/mockData";
 
 export type PostAudience = "Everyone" | "Connections" | "Only me";
@@ -193,6 +194,9 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
   } catch {
     // Remote insert error caught gracefully; post remains in local cache
   }
+
+  // 4. Update user's consecutive day streak & activity count
+  void recordUserStreak(draft.authorId);
 
   notifyPostListeners();
   return publishedPost;

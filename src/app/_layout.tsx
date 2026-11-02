@@ -9,6 +9,7 @@ import {
   registerForPushNotificationsAsync,
   useNotificationObserver,
 } from "../lib/notifications";
+import { checkDailyStreakReminder } from "../lib/streaks";
 import { setupUpdateLifecycle } from "../lib/updates";
 import { AppThemeProvider, useAppColors } from "../theme/colors";
 
@@ -34,11 +35,12 @@ function RootNavigator() {
     return setupUpdateLifecycle();
   }, []);
 
-  // Register push notifications & check engagement reminders when user is authenticated
+  // Register push notifications & check engagement & streak reminders when user is authenticated
   useEffect(() => {
     if (user?.id) {
       registerForPushNotificationsAsync(user.id);
       void checkAndTriggerEngagementReminder(user.id);
+      void checkDailyStreakReminder(user.id);
     }
   }, [user?.id]);
 
@@ -55,6 +57,7 @@ function RootNavigator() {
         <Stack.Screen name="settings" options={{ presentation: "card" }} />
         <Stack.Screen name="notifications" options={{ presentation: "card" }} />
         <Stack.Screen name="discover" options={{ presentation: "card" }} />
+        <Stack.Screen name="leaderboard" options={{ presentation: "card" }} />
       </Stack>
     </View>
   );

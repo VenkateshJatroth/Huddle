@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect, useNavigation } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../auth/AuthProvider";
 import { Icon } from "../components/Icon";
@@ -26,6 +26,7 @@ import { useAppColors } from "../theme/colors";
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
+  const navigation = useNavigation();
   const { user } = useAuth();
 
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
@@ -35,21 +36,25 @@ export default function NotificationsScreen() {
   const [busyFollowId, setBusyFollowId] = useState<string | null>(null);
 
   const handleBack = useCallback(() => {
-    if (router.canGoBack()) {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else if (router.canGoBack()) {
       router.back();
     } else {
       router.replace("/(tabs)");
     }
-  }, []);
+  }, [navigation]);
 
-  useEffect(() => {
-    const onBackPress = () => {
-      handleBack();
-      return true;
-    };
-    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-    return () => sub.remove();
-  }, [handleBack]);
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+      const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+      return () => sub.remove();
+    }, [handleBack]),
+  );
 
   const loadNotifs = useCallback(async () => {
     if (!user) return;
@@ -61,9 +66,11 @@ export default function NotificationsScreen() {
     }
   }, [user]);
 
-  useEffect(() => {
-    void loadNotifs();
-  }, [loadNotifs]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadNotifs();
+    }, [loadNotifs]),
+  );
 
   useEffect(() => {
     if (!user) return;
