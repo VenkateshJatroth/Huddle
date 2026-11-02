@@ -16,7 +16,10 @@
       "icon": "./assets/icon.png",
       "supportsTablet": false,
       "bundleIdentifier": "com.venkateshjatroth.huddle",
-      "infoPlist": {}
+      "infoPlist": {
+        "NSCameraUsageDescription": "Huddle needs camera access for video calls.",
+        "NSMicrophoneUsageDescription": "Huddle needs microphone access for voice and video calls."
+      }
     },
     "android": {
       "package": "com.venkateshjatroth.huddle",
@@ -29,8 +32,13 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.INTERNET",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
@@ -40,6 +48,13 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "react-native-agora",
+        {
+          "cameraPermission": "Huddle needs camera access for video calls.",
+          "microphonePermission": "Huddle needs microphone access for voice and video calls."
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",

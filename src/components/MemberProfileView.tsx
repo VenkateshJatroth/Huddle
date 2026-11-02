@@ -142,7 +142,13 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
       );
       router.push({
         pathname: "/call/[id]",
-        params: { id: profile.id, callId: call.id, type: callType },
+        params: {
+          id: profile.id,
+          callId: call.id,
+          type: callType,
+          channelId: call.agora_channel || undefined,
+          token: call.agora_token || undefined,
+        },
       } as never);
     } catch {
       router.push({

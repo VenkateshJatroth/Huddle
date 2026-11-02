@@ -217,7 +217,13 @@ export default function ChatScreen() {
       );
       router.push({
         pathname: "/call/[id]",
-        params: { id: member.id, callId: call.id, type: callType },
+        params: {
+          id: member.id,
+          callId: call.id,
+          type: callType,
+          channelId: call.agora_channel || undefined,
+          token: call.agora_token || undefined,
+        },
       } as never);
     } catch {
       router.push({

@@ -86,6 +86,8 @@ function RootNavigator() {
         callId: callToAnswer.id,
         type: callToAnswer.call_type,
         incoming: "true",
+        channelId: callToAnswer.agora_channel || undefined,
+        token: callToAnswer.agora_token || undefined,
       },
     } as never);
   };
