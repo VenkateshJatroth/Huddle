@@ -54,13 +54,14 @@ import {
   type ProfileCompletionResult,
 } from "../../lib/profileCompletion";
 import { ProfileCompletionBanner } from "../../components/ProfileCompletionBanner";
+import { DailyHotTakeCard } from "../../components/DailyHotTakeCard";
 import { supabase } from "../../lib/supabase";
 import { useAppColors } from "../../theme/colors";
 
 export default function HomeScreen() {
   const colors = useAppColors();
   const { user } = useAuth();
-  const [feedFilter, setFeedFilter] = useState<"For you" | "Following">("For you");
+  const [feedFilter, setFeedFilter] = useState<"For you" | "Following" | "Confessions">("For you");
   const [selectedChannel, setSelectedChannel] = useState<CommunityChannel | "All">("All");
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [communityPosts, setCommunityPosts] = useState<PublishedPost[]>([]);
@@ -114,9 +115,11 @@ export default function HomeScreen() {
     let isCurrent = true;
     async function loadFeed() {
       try {
-        const feed = await fetchFeedPosts(feedFilter, user?.id, selectedChannel);
+        const queryFilter = feedFilter === "Following" ? "Following" : "For you";
+        const feed = await fetchFeedPosts(queryFilter, user?.id, selectedChannel);
         if (!isCurrent) return;
-        setCommunityPosts(feed);
+        const finalFeed = feedFilter === "Confessions" ? feed.filter((p) => Boolean(p.is_anonymous)) : feed;
+        setCommunityPosts(finalFeed);
       } catch {
         // Fallback
       }
@@ -186,14 +189,16 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [, feed, unread, streak, prof] = await Promise.all([
+      const queryFilter = feedFilter === "Following" ? "Following" : "For you";
+      const [, rawFeed, unread, streak, prof] = await Promise.all([
         loadSpotlight(),
-        fetchFeedPosts(feedFilter, user?.id, selectedChannel),
+        fetchFeedPosts(queryFilter, user?.id, selectedChannel),
         user ? fetchUnreadNotificationCount(user.id) : Promise.resolve(0),
         user ? fetchUserStreak(user.id) : Promise.resolve(null),
         user ? fetchFullProfile(user.id) : Promise.resolve(null),
       ]);
-      setCommunityPosts(feed);
+      const finalFeed = feedFilter === "Confessions" ? rawFeed.filter((p) => Boolean(p.is_anonymous)) : rawFeed;
+      setCommunityPosts(finalFeed);
       setUnreadCount(unread);
       if (streak) setUserStreak(streak);
       if (prof) setProfileCompletion(checkProfileCompletion(prof));
@@ -334,6 +339,9 @@ export default function HomeScreen() {
         </Pressable>
       ) : null}
 
+      {/* Daily Hot Take Battle Widget */}
+      <DailyHotTakeCard />
+
       {/* Featured Gormati Members Spotlight */}
       {visibleSpotlight.length > 0 ? (
         <View style={styles.spotlightBlock}>
@@ -357,6 +365,15 @@ export default function HomeScreen() {
       <View style={styles.filterRow}>
         <ChoiceChip label="For you" selected={feedFilter === "For you"} onPress={() => setFeedFilter("For you")} />
         <ChoiceChip label="Following" selected={feedFilter === "Following"} onPress={() => setFeedFilter("Following")} />
+        <ChoiceChip label="Confessions 🎭" selected={feedFilter === "Confessions"} onPress={() => setFeedFilter("Confessions")} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Start 3-Minute Vibe Check Speed Match"
+          onPress={() => router.push("/vibe-check" as never)}
+          style={[styles.eventsBadgeBtn, { backgroundColor: colors.accentSoft }]}
+        >
+          <Text style={[styles.eventsBadgeText, { color: colors.accent }]}>Vibe Check ⚡</Text>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Explore local meetups and events"

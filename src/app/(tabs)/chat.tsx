@@ -183,14 +183,25 @@ export default function ChatTabScreen() {
           ) : null}
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Explore members"
-          onPress={() => router.push("/discover" as never)}
-          style={styles.headerAction}
-        >
-          <Icon name="search" color={colors.text} size={20} />
-        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Start 3-Minute Vibe Check Speed Match"
+            onPress={() => router.push("/vibe-check" as never)}
+            style={[styles.vibeCheckBadge, { backgroundColor: colors.accentSoft }]}
+          >
+            <Text style={[styles.vibeCheckBadgeText, { color: colors.accent }]}>⚡ Vibe Check</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Explore members"
+            onPress={() => router.push("/discover" as never)}
+            style={styles.headerAction}
+          >
+            <Icon name="search" color={colors.text} size={20} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Active Connected Friends Strip */}
@@ -395,5 +406,14 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 18, fontWeight: "700", textAlign: "center" },
   emptySubtitle: { fontSize: 13, textAlign: "center", lineHeight: 19, marginBottom: 8 },
+  vibeCheckBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  vibeCheckBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
 });
 

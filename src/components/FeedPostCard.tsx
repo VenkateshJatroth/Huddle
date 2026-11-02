@@ -55,8 +55,18 @@ export function FeedPostCard({
   const { user } = useAuth();
   const publishedPost = post as PublishedPost;
   const isAuthor = Boolean(currentUserId && publishedPost.author_id === currentUserId);
+  const isAnonymous = Boolean(publishedPost.is_anonymous);
+  const displayAuthor = isAnonymous ? (publishedPost.anonymous_alias || "Anonymous Member 🎭") : post.author;
+  const displayUsername = isAnonymous ? "confession" : post.username;
 
   const handleAuthorPress = () => {
+    if (isAnonymous) {
+      Alert.alert(
+        "Anonymous Confession 🎭",
+        "This post was shared anonymously. The author's identity is protected to encourage authentic, open community discussions.",
+      );
+      return;
+    }
     if (onAuthorPress) {
       onAuthorPress();
       return;
@@ -217,22 +227,32 @@ export function FeedPostCard({
       <View style={[rowStyles.row, styles.authorRow]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`View ${post.author}'s profile`}
+          accessibilityLabel={`View ${displayAuthor}'s profile`}
           onPress={handleAuthorPress}
           style={styles.authorPressable}
         >
-          {demoAvatarId ? (
+          {isAnonymous ? (
+            <View style={[styles.anonAvatarShell, { backgroundColor: colors.accentSoft }]}>
+              <Text style={styles.anonAvatarEmoji}>🎭</Text>
+            </View>
+          ) : demoAvatarId ? (
             <DemoAvatar id={demoAvatarId} name={post.author} tone={post.tone} />
           ) : (
             <Avatar name={post.author} tone={post.tone} />
           )}
           <View style={styles.authorDetails}>
             <View style={[rowStyles.row, styles.nameLine]}>
-              <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>{post.author}</Text>
-              {topBadge ? <UserBadge badge={topBadge} compact /> : null}
+              <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>{displayAuthor}</Text>
+              {isAnonymous ? (
+                <View style={[styles.confessionPill, { backgroundColor: colors.subtle }]}>
+                  <Text style={[styles.confessionPillText, { color: colors.accent }]}>Confession 🎭</Text>
+                </View>
+              ) : topBadge ? (
+                <UserBadge badge={topBadge} compact />
+              ) : null}
               <Text style={[styles.metaText, { color: colors.secondary }]}>· {post.time}</Text>
             </View>
-            <Text style={[styles.metaText, { color: colors.secondary }]}>@{post.username}</Text>
+            <Text style={[styles.metaText, { color: colors.secondary }]}>@{displayUsername}</Text>
           </View>
         </Pressable>
         <Pressable
@@ -457,4 +477,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  anonAvatarShell: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  anonAvatarEmoji: { fontSize: 20 },
+  confessionPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 2,
+  },
+  confessionPillText: { fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
 });

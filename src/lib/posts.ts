@@ -35,6 +35,8 @@ export type PostDraft = {
   pollQuestion?: string | null;
   pollOptions?: string[] | null;
   location?: string;
+  isAnonymous?: boolean | null;
+  anonymousAlias?: string | null;
 };
 
 export type PublishedPost = CommunityPost & {
@@ -46,6 +48,8 @@ export type PublishedPost = CommunityPost & {
   audio_duration?: number | null;
   poll_question?: string | null;
   poll_options?: string[] | null;
+  is_anonymous?: boolean | null;
+  anonymous_alias?: string | null;
   created_at: string;
 };
 
@@ -183,6 +187,8 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
     audio_duration: draft.audioDuration || null,
     poll_question: draft.pollQuestion || null,
     poll_options: draft.pollOptions || null,
+    is_anonymous: Boolean(draft.isAnonymous),
+    anonymous_alias: draft.anonymousAlias || null,
     created_at: nowIso,
   };
 
@@ -205,6 +211,8 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
       audio_duration: draft.audioDuration || null,
       poll_question: draft.pollQuestion || null,
       poll_options: draft.pollOptions || null,
+      is_anonymous: Boolean(draft.isAnonymous),
+      anonymous_alias: draft.anonymousAlias || null,
       created_at: nowIso,
     });
   } catch {
@@ -416,6 +424,8 @@ export async function fetchFeedPosts(
         audio_duration: row.audio_duration,
         poll_question: row.poll_question,
         poll_options: row.poll_options,
+        is_anonymous: Boolean(row.is_anonymous),
+        anonymous_alias: row.anonymous_alias,
         created_at: row.created_at,
       }));
     }
@@ -501,6 +511,8 @@ export async function fetchUserPosts(userId: string): Promise<PublishedPost[]> {
         audio_duration: row.audio_duration,
         poll_question: row.poll_question,
         poll_options: row.poll_options,
+        is_anonymous: Boolean(row.is_anonymous),
+        anonymous_alias: row.anonymous_alias,
         created_at: row.created_at,
       }));
 

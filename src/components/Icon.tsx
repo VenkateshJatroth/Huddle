@@ -24,7 +24,10 @@ export type AppIconName =
   | "close"
   | "send"
   | "bookmark"
-  | "settings";
+  | "settings"
+  | "phone"
+  | "video"
+  | "lock";
 
 const iconNames = {
   home: { ios: "house", android: "home", web: "home" },
@@ -50,6 +53,9 @@ const iconNames = {
   send: { ios: "paperplane", android: "send", web: "send" },
   bookmark: { ios: "bookmark", android: "bookmark", web: "bookmark" },
   settings: { ios: "gearshape", android: "settings", web: "settings" },
+  phone: { ios: "phone", android: "phone", web: "phone" },
+  video: { ios: "video", android: "videocam", web: "videocam" },
+  lock: { ios: "lock", android: "lock", web: "lock" },
 } satisfies Record<AppIconName, SymbolViewProps["name"]>;
 
 type IconProps = {

@@ -36,6 +36,7 @@ import {
 import type { ChatMessage } from "../../lib/gormati-chat";
 import { fetchMemberProfile } from "../../lib/gormati-profiles";
 import type { GormatiProfile } from "../../lib/gormati-profiles";
+import { startCall } from "../../lib/calling";
 import { useAppColors } from "../../theme/colors";
 
 export default function ChatScreen() {
@@ -204,6 +205,28 @@ export default function ChatScreen() {
     setInputText(prompt);
   };
 
+  const handleStartCall = async (callType: "voice" | "video") => {
+    if (!user || !member?.id) return;
+    try {
+      const call = await startCall(
+        user.id,
+        member.id,
+        callType,
+        user.user_metadata?.full_name || user.email?.split("@")[0] || "Member",
+        user.user_metadata?.avatar_url,
+      );
+      router.push({
+        pathname: "/call/[id]",
+        params: { id: member.id, callId: call.id, type: callType },
+      } as never);
+    } catch {
+      router.push({
+        pathname: "/call/[id]",
+        params: { id: member.id, type: callType },
+      } as never);
+    }
+  };
+
   const memberName = member?.display_name ?? "Member";
   const myUserId = user?.id ?? "me";
 
@@ -270,14 +293,37 @@ export default function ChatScreen() {
           </View>
         </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Chat options"
-          onPress={() => setSafetyModalVisible(true)}
-          style={styles.optionsButton}
-        >
-          <Icon name="more" color={colors.text} size={20} />
-        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Voice Call"
+            onPress={() => { void handleStartCall("voice"); }}
+            style={styles.optionsButton}
+            hitSlop={8}
+          >
+            <Icon name="phone" color={colors.text} size={19} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Video Call"
+            onPress={() => { void handleStartCall("video"); }}
+            style={styles.optionsButton}
+            hitSlop={8}
+          >
+            <Icon name="video" color={colors.text} size={20} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Chat options"
+            onPress={() => setSafetyModalVisible(true)}
+            style={styles.optionsButton}
+            hitSlop={8}
+          >
+            <Icon name="more" color={colors.text} size={20} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Messages Thread */}

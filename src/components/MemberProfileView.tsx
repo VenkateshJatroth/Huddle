@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   BackHandler,
   Dimensions,
+  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -28,9 +30,11 @@ import {
 } from "./ui";
 import { VoiceIntroCard } from "./VoiceIntroCard";
 import { getUserBadges } from "../lib/badges";
+import { startCall } from "../lib/calling";
 import { fetchMemberProfile, recordLike, type GormatiProfile } from "../lib/gormati-profiles";
 import { fetchUserPosts, type PublishedPost } from "../lib/posts";
 import { followProfile } from "../lib/relationships";
+import { checkSparkStatus, sendSecretSpark, PRESET_COMPLIMENTS } from "../lib/sparks";
 import { fetchUserStreak, type UserStreakInfo } from "../lib/streaks";
 import { useAppColors } from "../theme/colors";
 
@@ -55,6 +59,16 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
   const [isLiking, setIsLiking] = useState(false);
   const [safetyModalVisible, setSafetyModalVisible] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+
+  // Secret Sparks state
+  const [sparkStatus, setSparkStatus] = useState<{ hasSent: boolean; isMutual: boolean }>({
+    hasSent: false,
+    isMutual: false,
+  });
+  const [sparkModalVisible, setSparkModalVisible] = useState(false);
+  const [selectedCompliment, setSelectedCompliment] = useState<string>(PRESET_COMPLIMENTS[0]);
+  const [isSendingSpark, setIsSendingSpark] = useState(false);
+  const [mutualCelebrationVisible, setMutualCelebrationVisible] = useState(false);
 
   const handleBack = useCallback(() => {
     if (onBack) {
@@ -97,6 +111,13 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
           setMemberPosts(postsData);
           setUserStreak(streakData);
         }
+
+        if (user?.id && user.id !== memberId) {
+          const sparkInfo = await checkSparkStatus(user.id, memberId);
+          if (isCurrent) {
+            setSparkStatus(sparkInfo);
+          }
+        }
       } catch {
         // Non-blocking query guard
       } finally {
@@ -107,7 +128,53 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
     return () => {
       isCurrent = false;
     };
-  }, [memberId]);
+  }, [memberId, user?.id]);
+
+  const handleStartCall = async (callType: "voice" | "video") => {
+    if (!user || !profile) return;
+    try {
+      const call = await startCall(
+        user.id,
+        profile.id,
+        callType,
+        user.user_metadata?.full_name || user.email?.split("@")[0] || "Member",
+        user.user_metadata?.avatar_url,
+      );
+      router.push({
+        pathname: "/call/[id]",
+        params: { id: profile.id, callId: call.id, type: callType },
+      } as never);
+    } catch {
+      router.push({
+        pathname: "/call/[id]",
+        params: { id: profile.id, type: callType },
+      } as never);
+    }
+  };
+
+  const handleSendSpark = async () => {
+    if (!user || !profile || isSendingSpark) return;
+    setIsSendingSpark(true);
+    try {
+      const res = await sendSecretSpark(user.id, profile.id, selectedCompliment);
+      if (res.success) {
+        setSparkStatus({ hasSent: true, isMutual: res.isMutual });
+        setSparkModalVisible(false);
+        if (res.isMutual) {
+          setMutualCelebrationVisible(true);
+        } else {
+          Alert.alert(
+            "Secret Spark Sent! ⚡",
+            `Your compliment was anonymously delivered to ${profile.display_name}. If they send you a spark too, you'll instantly match!`,
+          );
+        }
+      } else {
+        Alert.alert("Notice", res.error || "Could not send spark.");
+      }
+    } finally {
+      setIsSendingSpark(false);
+    }
+  };
 
   const handleLike = async () => {
     if (!profile || isLiking || isLiked) return;
@@ -210,6 +277,28 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
         </Text>
         <View style={styles.navRight}>
           {profile.is_verified ? <VerifiedBadge /> : null}
+          {user?.id && user.id !== profile.id ? (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Voice call"
+                onPress={() => { void handleStartCall("voice"); }}
+                style={styles.optionsButton}
+                hitSlop={8}
+              >
+                <Icon name="phone" color={colors.accent} size={19} />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Video call"
+                onPress={() => { void handleStartCall("video"); }}
+                style={styles.optionsButton}
+                hitSlop={8}
+              >
+                <Icon name="video" color={colors.accent} size={19} />
+              </Pressable>
+            </>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Share profile"
@@ -309,6 +398,46 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
             ) : null}
           </View>
         </Card>
+
+        {/* Secret Sparks Feature Card */}
+        {user?.id && user.id !== profile.id ? (
+          sparkStatus.isMutual ? (
+            <Card style={[styles.mutualSparkCard, { backgroundColor: colors.accentSoft, borderColor: colors.accent }]}>
+              <View style={styles.sparkRow}>
+                <View style={[styles.sparkCircle, { backgroundColor: colors.accent }]}>
+                  <Text style={[styles.sparkEmoji, { color: "#FFFFFF" }]}>⚡</Text>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[styles.sparkTitle, { color: colors.accent }]}>Mutual Spark! ⚡</Text>
+                  <Text style={[styles.sparkSubtitle, { color: colors.text }]}>
+                    You and {profile.display_name.split(" ")[0]} secretly sparked each other!
+                  </Text>
+                </View>
+                <AppButton label="Chat" onPress={handleMessage} />
+              </View>
+            </Card>
+          ) : (
+            <Card style={[styles.sparkBannerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.sparkRow}>
+                <View style={[styles.sparkCircle, { backgroundColor: colors.accentSoft }]}>
+                  <Text style={styles.sparkEmoji}>⚡</Text>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[styles.sparkTitle, { color: colors.text }]}>Secret Spark</Text>
+                  <Text style={[styles.sparkSubtitle, { color: colors.secondary }]}>
+                    Send an anonymous compliment. If it’s mutual, you both match!
+                  </Text>
+                </View>
+                <AppButton
+                  label={sparkStatus.hasSent ? "Sent ⚡" : "Spark ⚡"}
+                  variant={sparkStatus.hasSent ? "subtle" : "outline"}
+                  disabled={sparkStatus.hasSent}
+                  onPress={() => setSparkModalVisible(true)}
+                />
+              </View>
+            </Card>
+          )
+        ) : null}
 
         {/* Active Daily Streak Banner */}
         {userStreak && (userStreak.currentStreak > 0 || userStreak.longestStreak > 0) ? (
@@ -454,6 +583,109 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
           onBlockedOrReported={handleBack}
         />
       ) : null}
+
+      {/* Secret Spark Compliment Modal */}
+      <Modal
+        visible={sparkModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSparkModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.sparkModalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.sparkModalHeader}>
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={[styles.sparkModalTitle, { color: colors.text }]}>Send Secret Spark ⚡</Text>
+                <Text style={[styles.sparkModalSubtitle, { color: colors.secondary }]}>
+                  Choose a secret compliment for {profile.display_name}. Delivered 100% anonymously. If they spark you back, you both match!
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close spark modal"
+                onPress={() => setSparkModalVisible(false)}
+                hitSlop={8}
+                style={styles.modalCloseBtn}
+              >
+                <Icon name="close" color={colors.secondary} size={20} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={styles.complimentsScroll} showsVerticalScrollIndicator={false}>
+              {PRESET_COMPLIMENTS.map((item) => {
+                const isSelected = selectedCompliment === item;
+                return (
+                  <Pressable
+                    key={item}
+                    accessibilityRole="button"
+                    accessibilityLabel={item}
+                    onPress={() => setSelectedCompliment(item)}
+                    style={[
+                      styles.complimentOption,
+                      {
+                        backgroundColor: isSelected ? colors.accentSoft : colors.subtle,
+                        borderColor: isSelected ? colors.accent : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.complimentText,
+                        { color: isSelected ? colors.accent : colors.text },
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                    {isSelected ? (
+                      <Icon name="check" color={colors.accent} size={18} />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <AppButton
+                label={isSendingSpark ? "Sending Spark…" : "Send Spark ⚡"}
+                disabled={isSendingSpark}
+                onPress={() => { void handleSendSpark(); }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Mutual Spark Celebration Modal */}
+      <Modal
+        visible={mutualCelebrationVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMutualCelebrationVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.celebrationCard, { backgroundColor: colors.surface, borderColor: colors.accent }]}>
+            <Text style={styles.celebrationBigEmoji}>⚡ 🎉 ⚡</Text>
+            <Text style={[styles.celebrationTitle, { color: colors.text }]}>It’s a Mutual Spark!</Text>
+            <Text style={[styles.celebrationSub, { color: colors.secondary }]}>
+              You and {profile.display_name} secretly sparked each other. The feeling is mutual! Direct chat is now unlocked.
+            </Text>
+            <View style={{ gap: 10, width: "100%", marginTop: 8 }}>
+              <AppButton
+                label="Start Chatting Now 💬"
+                onPress={() => {
+                  setMutualCelebrationVisible(false);
+                  handleMessage();
+                }}
+              />
+              <AppButton
+                label="Awesome!"
+                variant="outline"
+                onPress={() => setMutualCelebrationVisible(false)}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -582,4 +814,25 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   bottomBarButton: { flex: 1 },
+  mutualSparkCard: { marginHorizontal: 16, padding: 14, borderWidth: 1.5 },
+  sparkBannerCard: { marginHorizontal: 16, padding: 14 },
+  sparkRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  sparkCircle: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  sparkEmoji: { fontSize: 20 },
+  sparkTitle: { fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
+  sparkSubtitle: { fontSize: 12, lineHeight: 17 },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
+  sparkModalCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 20, maxHeight: "80%", gap: 16 },
+  sparkModalHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  sparkModalTitle: { fontSize: 18, fontWeight: "800" },
+  sparkModalSubtitle: { fontSize: 13, lineHeight: 18 },
+  modalCloseBtn: { padding: 4 },
+  complimentsScroll: { maxHeight: 320 },
+  complimentOption: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 8 },
+  complimentText: { flex: 1, fontSize: 14, fontWeight: "600", marginRight: 8, lineHeight: 20 },
+  modalActions: { paddingTop: 8 },
+  celebrationCard: { margin: 24, borderRadius: 24, borderWidth: 2, padding: 24, alignItems: "center", gap: 12 },
+  celebrationBigEmoji: { fontSize: 44, textAlign: "center" },
+  celebrationTitle: { fontSize: 22, fontWeight: "900", textAlign: "center", letterSpacing: -0.4 },
+  celebrationSub: { fontSize: 14, textAlign: "center", lineHeight: 21 },
 });

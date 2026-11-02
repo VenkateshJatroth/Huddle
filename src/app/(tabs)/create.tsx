@@ -3,6 +3,7 @@ import {
   Alert,
   Pressable,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -30,6 +31,17 @@ import { useAppColors } from "../../theme/colors";
 
 const audiences = ["Everyone", "Connections", "Only me"] as const;
 
+const ANONYMOUS_ALIASES = [
+  "Midnight Fox 🦊",
+  "Velvet Rebel ⚡",
+  "Neon Wanderer 🌌",
+  "Shadow Poet 🌙",
+  "Urban Nomad 🏔️",
+  "Secret Stargazer ✨",
+  "Mystic Dreamer 🔮",
+  "Silent Rover 🐺",
+];
+
 export default function CreateScreen() {
   const colors = useAppColors();
   const { user } = useAuth();
@@ -43,6 +55,8 @@ export default function CreateScreen() {
   const [showPollCreator, setShowPollCreator] = useState(false);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [anonymousAlias, setAnonymousAlias] = useState(ANONYMOUS_ALIASES[0]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
 
@@ -101,6 +115,8 @@ export default function CreateScreen() {
           showPollCreator && pollQuestion.trim() && validPollOptions.length >= 2
             ? validPollOptions
             : null,
+        isAnonymous,
+        anonymousAlias: isAnonymous ? anonymousAlias : null,
       });
 
       setDraft("");
@@ -110,6 +126,7 @@ export default function CreateScreen() {
       setShowPollCreator(false);
       setPollQuestion("");
       setPollOptions(["", ""]);
+      setIsAnonymous(false);
       setPreviewVisible(false);
 
       Alert.alert(
@@ -284,7 +301,52 @@ export default function CreateScreen() {
         )}
       </Card>
 
-      {/* Community Circle / Topic Channel Selection */}
+        {/* Anonymous Confession Mode Toggle */}
+        <Card style={[styles.confessionCard, isAnonymous && { borderColor: colors.accent, borderWidth: 1.5 }]}>
+          <View style={styles.confessionHeader}>
+            <View style={{ flex: 1, gap: 3 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={[styles.fieldLabel, { color: colors.text }]}>Anonymous Confession 🎭</Text>
+                {isAnonymous ? (
+                  <View style={[styles.confessionTag, { backgroundColor: colors.accentSoft }]}>
+                    <Text style={[styles.confessionTagText, { color: colors.accent }]}>Masked</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={[styles.helperText, { color: colors.secondary }]}>
+                Share openly without revealing your identity. A mysterious alias will be shown instead of your name and profile.
+              </Text>
+            </View>
+            <Switch
+              value={isAnonymous}
+              onValueChange={setIsAnonymous}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          {isAnonymous ? (
+            <View style={[styles.aliasBox, { backgroundColor: colors.subtle, borderColor: colors.border }]}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={[styles.aliasLabel, { color: colors.secondary }]}>Posting alias</Text>
+                <Text style={[styles.aliasText, { color: colors.text }]}>{anonymousAlias}</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Shuffle alias"
+                onPress={() => {
+                  const next = ANONYMOUS_ALIASES[Math.floor(Math.random() * ANONYMOUS_ALIASES.length)];
+                  setAnonymousAlias(next);
+                }}
+                style={[styles.rerollBtn, { backgroundColor: colors.surface }]}
+              >
+                <Text style={[styles.rerollText, { color: colors.accent }]}>🎲 Shuffle</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </Card>
+
+        {/* Community Circle / Topic Channel Selection */}
       <View style={styles.audienceBlock}>
         <Text style={[styles.fieldLabel, { color: colors.text }]}>Community Circle</Text>
         <Text style={[styles.helperText, { color: colors.secondary }]}>
@@ -388,4 +450,13 @@ const styles = StyleSheet.create({
   removeOptionBtn: { padding: 4 },
   addOptionBtn: { paddingVertical: 6 },
   addOptionText: { fontSize: 13, fontWeight: "700" },
+  confessionCard: { gap: 10, padding: 14, borderRadius: 14 },
+  confessionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  confessionTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  confessionTagText: { fontSize: 11, fontWeight: "800", textTransform: "uppercase" },
+  aliasBox: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 12, borderRadius: 10, borderWidth: 1, marginTop: 4 },
+  aliasLabel: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
+  aliasText: { fontSize: 14, fontWeight: "700" },
+  rerollBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth },
+  rerollText: { fontSize: 12, fontWeight: "700" },
 });
