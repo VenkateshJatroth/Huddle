@@ -103,3 +103,4 @@ export function getUserBadges(profile?: {
 
   return badges;
 }
+

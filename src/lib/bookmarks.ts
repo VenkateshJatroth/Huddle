@@ -108,3 +108,4 @@ export async function fetchSavedPosts(userId: string): Promise<PublishedPost[]> 
     return [];
   }
 }
+

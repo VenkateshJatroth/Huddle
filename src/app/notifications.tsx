@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { router, useFocusEffect, useNavigation } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../auth/AuthProvider";
 import { Icon } from "../components/Icon";
@@ -26,7 +26,6 @@ import { useAppColors } from "../theme/colors";
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const navigation = useNavigation();
   const { user } = useAuth();
 
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
@@ -36,14 +35,16 @@ export default function NotificationsScreen() {
   const [busyFollowId, setBusyFollowId] = useState<string | null>(null);
 
   const handleBack = useCallback(() => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/(tabs)");
+    try {
+      if (router.canGoBack()) {
+        router.back();
+        return;
+      }
+    } catch {
+      // Fallback
     }
-  }, [navigation]);
+    router.replace("/(tabs)");
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -57,10 +58,16 @@ export default function NotificationsScreen() {
   );
 
   const loadNotifs = useCallback(async () => {
-    if (!user) return;
+    setIsLoading(true);
     try {
-      const data = await fetchNotifications(user.id);
-      setNotifications(data);
+      if (user?.id) {
+        const data = await fetchNotifications(user.id);
+        setNotifications(data || []);
+      } else {
+        setNotifications([]);
+      }
+    } catch {
+      setNotifications([]);
     } finally {
       setIsLoading(false);
     }
@@ -135,11 +142,12 @@ export default function NotificationsScreen() {
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel="Back to Home"
           onPress={handleBack}
+          hitSlop={10}
           style={styles.backButton}
         >
-          <Icon name="chevronLeft" color={colors.text} size={20} />
+          <Icon name="arrowBack" color={colors.text} size={22} />
         </Pressable>
 
         <View style={styles.headerTitleWrap}>
@@ -169,7 +177,10 @@ export default function NotificationsScreen() {
         <FlatList
           data={notifications}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            notifications.length === 0 && styles.listContentEmpty,
+          ]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -180,11 +191,22 @@ export default function NotificationsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Icon name="bell" color={colors.secondary} size={36} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No notifications</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.secondary }]}>
-                You’re all caught up! Matches, likes, and messages will appear here.
+              <View style={[styles.emptyIconCircle, { backgroundColor: colors.subtle }]}>
+                <Icon name="bell" color={colors.accent} size={32} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                No new notifications yet
               </Text>
+              <Text style={[styles.emptySubtitle, { color: colors.secondary }]}>
+                You’re all caught up! New connections, likes, comments, and community updates will appear here.
+              </Text>
+              <View style={{ marginTop: 14 }}>
+                <AppButton
+                  label="Explore Community"
+                  variant="primary"
+                  onPress={handleBack}
+                />
+              </View>
             </View>
           }
           renderItem={({ item }) => (
@@ -253,11 +275,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
-    transform: [{ rotate: "180deg" }],
   },
   headerTitleWrap: {
     flex: 1,
@@ -277,9 +298,11 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
   loadingText: { fontSize: 13 },
   listContent: { padding: 16, gap: 10 },
-  emptyContainer: { alignItems: "center", justifyContent: "center", paddingVertical: 60, paddingHorizontal: 24, gap: 10 },
-  emptyTitle: { fontSize: 16, fontWeight: "800" },
-  emptySubtitle: { fontSize: 13, lineHeight: 18, textAlign: "center" },
+  listContentEmpty: { flexGrow: 1, justifyContent: "center" },
+  emptyContainer: { alignItems: "center", justifyContent: "center", paddingVertical: 40, paddingHorizontal: 24, gap: 10 },
+  emptyIconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", marginBottom: 6 },
+  emptyTitle: { fontSize: 18, fontWeight: "800", textAlign: "center" },
+  emptySubtitle: { fontSize: 13, lineHeight: 18, textAlign: "center", paddingHorizontal: 16 },
   notifCard: { padding: 12, borderRadius: 14 },
   notifRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   notifInfo: { flex: 1, gap: 4 },
