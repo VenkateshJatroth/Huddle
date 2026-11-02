@@ -27,7 +27,7 @@ export async function startCall(
   callerName?: string,
   callerAvatar?: string | null,
 ): Promise<CallSession> {
-  const roomUrl = `https://meet.gormati.app/room-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
+  const roomUrl = `https://meet.huddle.app/room-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
 
   const { data, error } = await (supabase as any)
     .from("call_sessions")
@@ -51,7 +51,7 @@ export async function startCall(
       status: "ringing",
       room_url: roomUrl,
       created_at: new Date().toISOString(),
-      caller_name: callerName || "GorMati Member",
+      caller_name: callerName || "Huddle Member",
       caller_avatar: callerAvatar,
     };
   }
@@ -61,7 +61,7 @@ export async function startCall(
     await (supabase as any).from("notifications").insert({
       user_id: receiverId,
       actor_id: callerId,
-      actor_name: callerName || "GorMati Member",
+      actor_name: callerName || "Huddle Member",
       type: "message",
       content: `Incoming ${callType === "video" ? "Video" : "Voice"} Call from ${callerName || "a member"} 📞`,
       reference_id: data.id,
@@ -159,3 +159,4 @@ export function subscribeToIncomingCalls(
     void supabase.removeChannel(channel);
   };
 }
+

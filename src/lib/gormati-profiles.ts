@@ -326,7 +326,7 @@ export async function upsertGormatiProfile(
 ): Promise<GormatiProfile> {
   const parsedAge = draft.age ? parseInt(String(draft.age), 10) : null;
   const username = draft.username ? draft.username.trim().toLowerCase() : `user_${userId.slice(0, 8)}`;
-  const displayName = draft.display_name?.trim() || draft.full_name?.trim() || "Gormati Member";
+  const displayName = draft.display_name?.trim() || draft.full_name?.trim() || "Huddle Member";
 
   const payload: Database["public"]["Tables"]["profiles"]["Insert"] = {
     id: userId,

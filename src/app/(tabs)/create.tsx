@@ -95,7 +95,7 @@ export default function CreateScreen() {
 
     setIsPublishing(true);
     try {
-      const authorName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Gormati Member";
+      const authorName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Huddle Member";
       const username = user.user_metadata?.username || user.email?.split("@")[0] || "member";
 
       const validPollOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
@@ -131,7 +131,7 @@ export default function CreateScreen() {
 
       Alert.alert(
         "Post Published! 🎉",
-        "Your thoughts are now shared with the GorMati community.",
+        "Your thoughts are now shared with the Huddle community.",
         [
           {
             text: "View in Feed",

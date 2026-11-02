@@ -104,7 +104,7 @@ export default function SettingsScreen() {
     if (!user) return;
     Alert.alert(
       "Delete Account Permanently?",
-      "Are you sure you want to permanently delete your Gormati account? All your profile information, photos, matches, prompts, and message history will be immediately deleted. This action cannot be undone.",
+      "Are you sure you want to permanently delete your Huddle account? All your profile information, photos, matches, prompts, and message history will be immediately deleted. This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -117,7 +117,7 @@ export default function SettingsScreen() {
               if (res.success) {
                 Alert.alert(
                   "Account Deleted",
-                  "Your Gormati account and all associated data have been permanently removed.",
+                  "Your Huddle account and all associated data have been permanently removed.",
                   [{ text: "OK", onPress: () => router.replace("/(auth)" as never) }],
                 );
               } else {
@@ -299,7 +299,7 @@ export default function SettingsScreen() {
               onPress={() => {
                 Alert.alert(
                   "Community Safety Guidelines",
-                  "GorMati is a respectful space for real connections. Harassment, hate speech, inappropriate media, and impersonation are strictly prohibited.",
+                  "Huddle is a respectful space for real connections. Harassment, hate speech, inappropriate media, and impersonation are strictly prohibited.",
                 );
               }}
             >
@@ -314,7 +314,7 @@ export default function SettingsScreen() {
               onPress={() => {
                 Alert.alert(
                   "Privacy Policy",
-                  "GorMati respects your privacy. Your personal email and phone are never shared publicly without your explicit consent.",
+                  "Huddle respects your privacy. Your personal email and phone are never shared publicly without your explicit consent.",
                 );
               }}
             >

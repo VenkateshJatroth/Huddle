@@ -62,7 +62,7 @@ export default function OnboardingScreen() {
     if (!user) return;
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permission required", "Allow Gormati access to your photos to set your profile picture.");
+      Alert.alert("Permission required", "Allow Huddle access to your photos to set your profile picture.");
       return;
     }
 
@@ -159,7 +159,7 @@ export default function OnboardingScreen() {
           <View style={[styles.brandMark, { backgroundColor: colors.accent }]}>
             <Icon name="sparkles" color="#FFFFFF" size={18} />
           </View>
-          <Text style={[styles.brandTitle, { color: colors.text }]}>Gormati</Text>
+          <Text style={[styles.brandTitle, { color: colors.text }]}>Huddle</Text>
         </View>
 
         {/* Step Progress Indicator */}
@@ -179,7 +179,7 @@ export default function OnboardingScreen() {
         {step === 1 ? (
           <Card style={styles.card}>
             <Text style={[styles.stepEyebrow, { color: colors.secondary }]}>Step 1 of 4</Text>
-            <Text style={[styles.stepTitle, { color: colors.text }]}>Welcome to Gormati</Text>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>Welcome to Huddle</Text>
             <Text style={[styles.stepSubtitle, { color: colors.secondary }]}>
               Let&apos;s set up your profile so people in your community can recognize you.
             </Text>

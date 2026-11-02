@@ -255,7 +255,7 @@ export default function DiscoverScreen() {
       >
         <PageHeading
           title="Explore Members"
-          subtitle="Search and connect with curated GorMati community members."
+          subtitle="Search and connect with curated Huddle community members."
           eyebrow="Community Discovery"
         />
 

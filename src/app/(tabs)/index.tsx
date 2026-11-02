@@ -272,7 +272,7 @@ export default function HomeScreen() {
           <Icon name="sparkles" color="#FFFFFF" size={18} />
         </View>
         <View style={styles.brandText}>
-          <Text style={[styles.brandName, { color: colors.text }]}>Gormati</Text>
+          <Text style={[styles.brandName, { color: colors.text }]}>Huddle</Text>
           <Text style={[styles.brandSubtitle, { color: colors.secondary }]}>Your people, your place</Text>
         </View>
         <IconButton

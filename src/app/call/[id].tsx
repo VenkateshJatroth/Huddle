@@ -168,7 +168,7 @@ export default function CallScreen() {
   };
 
   const isVideo = type === "video";
-  const memberName = member?.display_name || "GorMati Member";
+  const memberName = member?.display_name || "Huddle Member";
   const memberHandle = member?.username ? `@${member.username}` : "";
 
   return (

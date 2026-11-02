@@ -53,7 +53,7 @@ export function UpdateNotificationBanner() {
       <View style={styles.contentRow}>
         <View style={styles.textWrap}>
           <Text style={styles.title}>
-            {state.isDownloading ? "Updating Gormati…" : "New version available"}
+            {state.isDownloading ? "Updating Huddle…" : "New version available"}
           </Text>
           <Text style={styles.subtitle}>
             {state.isDownloading
@@ -72,7 +72,7 @@ export function UpdateNotificationBanner() {
               }}
               style={styles.updateButton}
               accessibilityRole="button"
-              accessibilityLabel="Update Gormati now"
+              accessibilityLabel="Update Huddle now"
             >
               <Text style={styles.updateButtonText}>Update</Text>
             </Pressable>

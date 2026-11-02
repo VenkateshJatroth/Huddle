@@ -40,7 +40,7 @@ const demoNotifications: InAppNotification[] = [
     user_id: "me",
     actor_name: "Dev Menon",
     type: "follow",
-    content: "Connected with you on GorMati.",
+    content: "Connected with you on Huddle.",
     is_read: false,
     created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
     time: "2h ago",
@@ -219,7 +219,7 @@ export async function registerForPushNotificationsAsync(userId: string): Promise
   if (Platform.OS === "android") {
     try {
       await Notifications.setNotificationChannelAsync("default", {
-        name: "GorMati Notifications",
+        name: "Huddle Notifications",
         importance: AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: "#000000",
@@ -356,7 +356,7 @@ export async function checkAndTriggerEngagementReminder(userId: string): Promise
     // Insert gentle in-app reminder
     await (supabase as any).from("notifications").insert({
       user_id: userId,
-      actor_name: "GorMati Community",
+      actor_name: "Huddle Community",
       type: "reply",
       content: "What's happening in your world? Share a thought, photo, or update with your circles ✨",
       reference_id: "create",
@@ -370,7 +370,7 @@ export async function checkAndTriggerEngagementReminder(userId: string): Promise
         if (status === "granted") {
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: "GorMati Community ✨",
+              title: "Huddle Community ✨",
               body: "What's new with you today? Share a story, photo, or thought with your circles!",
               data: { url: "/create" },
             },

@@ -302,7 +302,7 @@ export async function fetchPostReplies(postId: string): Promise<PostReply[]> {
         id: r.id,
         post_id: r.post_id,
         author_id: r.author_id,
-        author_name: r.author_name || "Gormati Member",
+        author_name: r.author_name || "Huddle Member",
         username: r.username || "member",
         text: r.text,
         created_at: r.created_at,
@@ -408,7 +408,7 @@ export async function fetchFeedPosts(
       remotePosts = data.map((row: any) => ({
         id: row.id,
         author_id: row.author_id,
-        author: row.author_name || "Gormati Member",
+        author: row.author_name || "Huddle Member",
         username: row.username || "member",
         tone: 0,
         time: formatTimeAgo(row.created_at),
@@ -495,7 +495,7 @@ export async function fetchUserPosts(userId: string): Promise<PublishedPost[]> {
       const remote: PublishedPost[] = data.map((row: any) => ({
         id: row.id,
         author_id: row.author_id,
-        author: row.author_name || "Gormati Member",
+        author: row.author_name || "Huddle Member",
         username: row.username || "member",
         tone: 0,
         time: formatTimeAgo(row.created_at),

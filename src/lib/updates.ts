@@ -73,7 +73,7 @@ export async function downloadAndApplyUpdate(): Promise<boolean> {
 export function promptUserForUpdate() {
   Alert.alert(
     "Update Available",
-    "A new version of Gormati is available! Would you like to update now?",
+    "A new version of Huddle is available! Would you like to update now?",
     [
       {
         text: "Later",
@@ -110,7 +110,7 @@ export async function checkForAppUpdates(options?: {
   if (!isUpdatesEnabled()) {
     console.log("[Updates] Updates are disabled in this environment (development or Expo Go).");
     if (showNoUpdateAlert) {
-      Alert.alert("Up to Date", "Gormati is running in development mode.");
+      Alert.alert("Up to Date", "Huddle is running in development mode.");
     }
     return false;
   }
@@ -135,7 +135,7 @@ export async function checkForAppUpdates(options?: {
     } else {
       updateState({ isChecking: false, updateAvailable: false });
       if (showNoUpdateAlert) {
-        Alert.alert("Up to Date", "Gormati is currently on the latest version.");
+        Alert.alert("Up to Date", "Huddle is currently on the latest version.");
       }
       return false;
     }

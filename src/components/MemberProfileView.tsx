@@ -191,10 +191,10 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
   const handleShare = async () => {
     if (!profile) return;
     try {
-      const profileUrl = `https://gormati.app/m/${profile.username || profile.id}`;
+      const profileUrl = `https://huddle.app/m/${profile.username || profile.id}`;
       await Share.share({
-        title: `${profile.display_name}'s Profile on GorMati`,
-        message: `Connect with ${profile.display_name} (@${profile.username}) on GorMati:\n${profileUrl}`,
+        title: `${profile.display_name}'s Profile on Huddle`,
+        message: `Connect with ${profile.display_name} (@${profile.username}) on Huddle:\n${profileUrl}`,
         url: profileUrl,
       });
     } catch {
@@ -211,7 +211,7 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
     return (
       <View style={[styles.loadingScreen, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.accent} size="large" />
-        <Text style={[styles.loadingText, { color: colors.secondary }]}>Loading Gormati member…</Text>
+        <Text style={[styles.loadingText, { color: colors.secondary }]}>Loading Huddle member…</Text>
       </View>
     );
   }

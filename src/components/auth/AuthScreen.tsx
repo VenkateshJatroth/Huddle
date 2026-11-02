@@ -225,13 +225,26 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
 
   async function completeDirectPhoneAuth(fullPhone: string) {
     const cleanPhone = fullPhone.replace(/\D/g, "");
-    const phoneEmail = `${cleanPhone}@phone.gormati.app`;
-    const phonePassword = `Gormati!PhoneAuth#${cleanPhone}`;
+    const phoneEmail = `${cleanPhone}@phone.huddle.app`;
+    const phonePassword = `Huddle!PhoneAuth#${cleanPhone}`;
+    const legacyEmail = `${cleanPhone}@phone.gormati.app`;
+    const legacyPassword = `Gormati!PhoneAuth#${cleanPhone}`;
 
-    const { error: signInErr } = await supabase.auth.signInWithPassword({
+    // Try modern Huddle auth, fallback to legacy if account was created previously
+    let { error: signInErr } = await supabase.auth.signInWithPassword({
       email: phoneEmail,
       password: phonePassword,
     });
+
+    if (signInErr) {
+      const legacyRes = await supabase.auth.signInWithPassword({
+        email: legacyEmail,
+        password: legacyPassword,
+      });
+      if (!legacyRes.error) {
+        signInErr = null;
+      }
+    }
 
     if (signInErr) {
       const { error: signUpErr } = await supabase.auth.signUp({
@@ -268,7 +281,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const redirectUrl = "gormati://auth/callback";
+      const redirectUrl = "huddle://auth/callback";
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -376,7 +389,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
           <Icon name="sparkles" color="#FFFFFF" size={18} />
         </View>
         <View style={styles.brandText}>
-          <Text style={[styles.brandName, { color: colors.text }]}>GorMati</Text>
+          <Text style={[styles.brandName, { color: colors.text }]}>Huddle</Text>
           <Text style={[styles.brandSubtitle, { color: colors.secondary }]}>Your people, your place</Text>
         </View>
       </View>
@@ -384,7 +397,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
       <PageHeading
         title={title}
         subtitle={isSignUp ? "Join communities across India and globally, in every language and interest." : "Sign in to continue to your community."}
-        eyebrow={isSignUp ? "Join GorMati" : "Good to see you"}
+        eyebrow={isSignUp ? "Join Huddle" : "Good to see you"}
       />
 
       {/* Primary Social Option: Continue with Google */}
@@ -607,7 +620,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
 
       <View style={styles.switchRow}>
         <Text style={[styles.switchPrompt, { color: colors.secondary }]}>
-          {isSignUp ? "Already have an account?" : "New to GorMati?"}
+          {isSignUp ? "Already have an account?" : "New to Huddle?"}
         </Text>
         {isSignUp ? (
           <Link href="/sign-in" asChild>
@@ -729,7 +742,7 @@ function getAuthErrorMessage(error: unknown, isSignUp: boolean): string {
     return "Too many attempts. Wait a moment and try again.";
   }
   if (message.includes("network") || message.includes("fetch")) {
-    return "Could not reach GorMati right now. Check your connection and try again.";
+    return "Could not reach Huddle right now. Check your connection and try again.";
   }
   return isSignUp
     ? "We couldn’t create your account. Check your details and try again."

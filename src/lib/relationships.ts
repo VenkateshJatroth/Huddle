@@ -55,7 +55,7 @@ export class RelationshipSchemaUnavailableError extends Error {
 
 export class RelationshipTargetUnavailableError extends Error {
   constructor() {
-    super("This Gormati profile is no longer available.");
+    super("This Huddle profile is no longer available.");
     this.name = "RelationshipTargetUnavailableError";
   }
 }
@@ -140,7 +140,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function requireUserId(userId: string): void {
   if (!userId || !userId.trim()) {
-    throw new Error("A valid signed-in Gormati user is required to manage connections.");
+    throw new Error("A valid signed-in Huddle user is required to manage connections.");
   }
 }
 
@@ -226,9 +226,9 @@ async function getCurrentUserName(userId: string): Promise<string> {
       .select("display_name, full_name")
       .eq("id", userId)
       .maybeSingle();
-    return data?.display_name || data?.full_name || "A GorMati member";
+    return data?.display_name || data?.full_name || "A Huddle member";
   } catch {
-    return "A GorMati member";
+    return "A Huddle member";
   }
 }
 

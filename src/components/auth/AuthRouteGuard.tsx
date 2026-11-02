@@ -57,7 +57,7 @@ function AuthLoadingScreen() {
     <View style={[styles.loadingScreen, { backgroundColor: colors.background }]}>
       <ActivityIndicator color={colors.accent} />
       <Text accessibilityLiveRegion="polite" style={[styles.loadingText, { color: colors.secondary }]}>
-        Restoring your Gormati session…
+        Restoring your Huddle session…
       </Text>
     </View>
   );

@@ -70,10 +70,10 @@ export function SafetyActionModal({
         details: details.trim() || undefined,
       });
       handleResetAndClose();
-      Alert.alert(
-        "Report Submitted",
-        `Thank you for helping keep Gormati safe. Our safety team will review this report within 24 hours. ${memberName} has also been blocked.`,
-      );
+        Alert.alert(
+          "Report Submitted",
+          `Thank you for helping keep Huddle safe. Our safety team will review this report within 24 hours. ${memberName} has also been blocked.`,
+        );
       onBlockedOrReported?.();
     } finally {
       setIsSubmitting(false);

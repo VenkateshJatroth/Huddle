@@ -122,7 +122,7 @@ function RootNavigator() {
           </View>
           <View style={styles.callDetails}>
             <Text numberOfLines={1} style={[styles.callerName, { color: colors.text }]}>
-              {incomingCall.caller_name || "GorMati Member"}
+              {incomingCall.caller_name || "Huddle Member"}
             </Text>
             <Text style={[styles.callTypeLabel, { color: colors.secondary }]}>
               Incoming {incomingCall.call_type === "video" ? "Video" : "Voice"} Call…

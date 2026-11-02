@@ -212,11 +212,11 @@ export async function checkDailyStreakReminder(userId: string): Promise<void> {
     // Insert in-app streak reminder notification
     await (supabase as any).from("notifications").insert({
       user_id: userId,
-      actor_name: "GorMati Streaks 🔥",
+      actor_name: "Huddle Streaks 🔥",
       type: "reply",
       content: streakInfo.currentStreak > 0
         ? `Keep your ${streakInfo.currentStreak}-day streak alive! Post about your day or interests ✨`
-        : "Start your daily GorMati posting streak! Share a quick photo or thought with your circles 🔥",
+        : "Start your daily Huddle posting streak! Share a quick photo or thought with your circles 🔥",
       reference_id: "create",
       is_read: false,
     });

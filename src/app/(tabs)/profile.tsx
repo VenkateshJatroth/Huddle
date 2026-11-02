@@ -294,7 +294,7 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
   function promptDeleteAccount() {
     Alert.alert(
       "Delete Account Permanently?",
-      "Are you sure you want to permanently delete your Gormati account? All your profile information, photos, matches, prompts, and message history will be immediately deleted. This action cannot be undone.",
+      "Are you sure you want to permanently delete your Huddle account? All your profile information, photos, matches, prompts, and message history will be immediately deleted. This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -316,7 +316,7 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
       if (res.success) {
         Alert.alert(
           "Account Deleted",
-          "Your Gormati account and all associated data have been permanently removed.",
+          "Your Huddle account and all associated data have been permanently removed.",
           [
             {
               text: "OK",
@@ -371,13 +371,13 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
 
   async function handleShareProfile() {
     try {
-      const name = profile?.display_name || user.email?.split("@")[0] || "Gormati Member";
+      const name = profile?.display_name || user.email?.split("@")[0] || "Huddle Member";
       const handle = profile?.username ? `@${profile.username}` : "";
-      const profileUrl = `https://gormati.app/m/${profile?.username || user.id}`;
+      const profileUrl = `https://huddle.app/m/${profile?.username || user.id}`;
 
       await Share.share({
-        title: `${name}'s Profile on GorMati`,
-        message: `Connect with ${name} ${handle ? `(${handle}) ` : ""}on GorMati — Your people, your place:\n${profileUrl}`,
+        title: `${name}'s Profile on Huddle`,
+        message: `Connect with ${name} ${handle ? `(${handle}) ` : ""}on Huddle — Your people, your place:\n${profileUrl}`,
         url: profileUrl,
       });
     } catch {
@@ -388,7 +388,7 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
   async function pickAndUploadAvatar() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permission required", "Allow Gormati to access your photos to change your profile picture.");
+      Alert.alert("Permission required", "Allow Huddle to access your photos to change your profile picture.");
       return;
     }
 
@@ -519,7 +519,7 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
       {loadState === "missing" ? (
         <View style={styles.stateBlock}>
           <LocalPreviewNotice>
-            No profile record exists for this account yet. Complete your Gormati onboarding setup to connect with others.
+            No profile record exists for this account yet. Complete your Huddle onboarding setup to connect with others.
           </LocalPreviewNotice>
           <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
             <AppButton label="Complete profile" onPress={() => router.push("/onboarding" as never)} />
@@ -584,7 +584,7 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
                   <Text style={[styles.verifiedBadge, { color: colors.success }]}>✓ Verified</Text>
                 ) : null}
                 <Text style={[styles.privacyLabel, { color: colors.secondary }]}>
-                  {profile.is_private ? "Private profile" : "Public to Gormati members"}
+                  {profile.is_private ? "Private profile" : "Public to Huddle members"}
                 </Text>
               </View>
             </View>
@@ -784,7 +784,7 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
 
           {/* Prompt Cards */}
           <View style={styles.fieldGroup}>
-            <Text style={[styles.fieldLabel, { color: colors.text }]}>Gormati prompt</Text>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Huddle prompt</Text>
             <View style={styles.chips}>
               {AVAILABLE_PROMPT_QUESTIONS.map((question) => (
                 <ChoiceChip
@@ -836,7 +836,7 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
             <Text style={[styles.fieldHint, { color: colors.secondary }]}>
               {draft.is_private
                 ? "Only you can view this profile."
-                : "Signed-in Gormati members can view this profile."}
+                : "Signed-in Huddle members can view this profile."}
             </Text>
           </View>
 

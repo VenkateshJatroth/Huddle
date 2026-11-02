@@ -88,6 +88,7 @@ export function getProfileCompletion(
       displayName.length >= 2 &&
       lowerName !== "member" &&
       lowerName !== "gormati member" &&
+      lowerName !== "huddle member" &&
       !lowerName.startsWith("user_"),
   );
   if (hasDisplayName) {
@@ -235,10 +236,10 @@ export async function checkAndTriggerProfileCompletionReminder(
     // 1. In-app notification
     await (supabase as any).from("notifications").insert({
       user_id: userId,
-      actor_name: "GorMati Community",
+      actor_name: "Huddle Community",
       type: "message",
       content:
-        "Complete your GorMati profile so other members can discover all your details! ✨",
+        "Complete your Huddle profile so other members can discover all your details! ✨",
       reference_id: "profile",
       is_read: false,
     });
@@ -250,8 +251,8 @@ export async function checkAndTriggerProfileCompletionReminder(
         if (status === "granted") {
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: "Complete Your GorMati Profile ✨",
-              body: "Complete your GorMati profile so other members can discover all your details!",
+              title: "Complete Your Huddle Profile ✨",
+              body: "Complete your Huddle profile so other members can discover all your details!",
               data: { url: "/(tabs)/profile" },
             },
             trigger: null,

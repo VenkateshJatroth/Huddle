@@ -132,8 +132,8 @@ export function FeedPostCard({
   const handleShare = async () => {
     try {
       await Share.share({
-        title: `Post by ${post.author} on GorMati`,
-        message: `"${post.text}"\n\n— ${post.author} (@${post.username}) on GorMati\nhttps://gormati.app/post/${post.id}`,
+        title: `Post by ${post.author} on Huddle`,
+        message: `"${post.text}"\n\n— ${post.author} (@${post.username}) on Huddle\nhttps://huddle.app/post/${post.id}`,
       });
     } catch {
       // User dismissed
@@ -184,7 +184,7 @@ export function FeedPostCard({
           {
             text: "Report Post",
             style: "destructive",
-            onPress: () => Alert.alert("Reported", "Thank you for helping keep the GorMati community safe."),
+            onPress: () => Alert.alert("Reported", "Thank you for helping keep the Huddle community safe."),
           },
           { text: "Cancel", style: "cancel" },
         ],
@@ -203,7 +203,7 @@ export function FeedPostCard({
 
     setIsSubmittingReply(true);
     try {
-      const authorName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Gormati Member";
+      const authorName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Huddle Member";
       const username = user.user_metadata?.username || user.email?.split("@")[0] || "member";
 
       const created = await createPostReply(post.id, text, {

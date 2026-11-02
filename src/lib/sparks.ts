@@ -15,7 +15,7 @@ export const PRESET_COMPLIMENTS = [
   "Always love reading your thoughts & perspectives 💭",
   "Lowkey have a major crush on your vibe 💫",
   "Would love to grab a chai or coffee together sometime ☕",
-  "You're easily one of the most interesting people on GorMati 🌟",
+  "You're easily one of the most interesting people on Huddle 🌟",
 ];
 
 /**
@@ -54,7 +54,7 @@ export async function sendSecretSpark(
       await (supabase as any).from("notifications").insert({
         user_id: receiverId,
         actor_id: senderId,
-        actor_name: "GorMati Sparks",
+        actor_name: "Huddle Sparks",
         type: "message",
         content: "⚡ It's a Mutual Spark! You both sent secret compliments to each other! Direct chat unlocked.",
         reference_id: senderId,
@@ -103,3 +103,4 @@ export async function checkSparkStatus(
 
   return { hasSent: false, isMutual: false };
 }
+

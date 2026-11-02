@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Platform, useColorScheme } from "react-native";
 
 /**
- * GorMati Sleek Black & White Minimalist Design System
+ * Huddle Sleek Black & White Minimalist Design System
  * High contrast monochromatic aesthetic: Pure Black (#000000), Charcoal (#121212),
  * Pure White (#FFFFFF), and Off-White Gray (#E5E5EA).
  */

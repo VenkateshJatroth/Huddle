@@ -145,7 +145,7 @@ export default function ConnectionsScreen() {
       </View>
 
       <LocalPreviewNotice>
-        Follow and connection state is synchronized with your signed-in Gormati account. Tap on any member to view their full profile or open a chat.
+        Follow and connection state is synchronized with your signed-in Huddle account. Tap on any member to view their full profile or open a chat.
       </LocalPreviewNotice>
 
       {loadState === "loading" ? (
@@ -265,7 +265,7 @@ export default function ConnectionsScreen() {
                 />
               );
             }) : (
-              <Card style={styles.emptyCard}><MutedText>No accepted follows yet. Search for Gormati members in Discover to get started.</MutedText></Card>
+              <Card style={styles.emptyCard}><MutedText>No accepted follows yet. Search for Huddle members in Discover to get started.</MutedText></Card>
             )}
           </View>
         </>

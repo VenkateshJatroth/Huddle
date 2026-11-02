@@ -26,7 +26,7 @@ export function AudioRecorderSection({
     setIsRecording(false);
     if (timerRef.current) clearInterval(timerRef.current);
     const finalDuration = Math.max(3, secondsRef.current);
-    const mockAudioUri = `gormati-audio://${Date.now()}.m4a`;
+    const mockAudioUri = `huddle-audio://${Date.now()}.m4a`;
     onAudioRecorded(mockAudioUri, finalDuration);
   }, [onAudioRecorded]);
 

@@ -73,7 +73,7 @@ export default function OnboardingProfileScreen() {
     const onBackPress = () => {
       Alert.alert(
         "Profile Setup Required",
-        "Please complete your profile details before exploring the GorMati community.",
+        "Please complete your profile details before exploring the Huddle community.",
         [{ text: "Continue Setup" }],
       );
       return true;
@@ -257,7 +257,7 @@ export default function OnboardingProfileScreen() {
               <Icon name="sparkles" color="#FFFFFF" size={18} />
             </View>
             <View>
-              <Text style={[styles.brandTitle, { color: colors.text }]}>GorMati</Text>
+              <Text style={[styles.brandTitle, { color: colors.text }]}>Huddle</Text>
               <Text style={[styles.brandSubtitle, { color: colors.secondary }]}>
                 Mandatory Profile Setup
               </Text>
@@ -514,7 +514,7 @@ export default function OnboardingProfileScreen() {
         {/* Submit Action */}
         <View style={styles.actionContainer}>
           <AppButton
-            label={isSaving ? "Saving Profile…" : "Save Profile & Enter GorMati"}
+            label={isSaving ? "Saving Profile…" : "Save Profile & Enter Huddle"}
             disabled={!completion.isCoreComplete || isSaving || isUploadingPhoto}
             onPress={() => {
               void handleSaveAndContinue();

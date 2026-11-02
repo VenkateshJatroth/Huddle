@@ -27,7 +27,7 @@ export const SAMPLE_MEETUPS: CommunityEvent[] = [
   {
     id: "sample-event-dubai",
     title: "Dubai Marina Sunset Networking Walk",
-    description: "Join fellow GorMati professionals for an evening stroll around Dubai Marina followed by Arabic coffee and conversations.",
+    description: "Join fellow Huddle professionals for an evening stroll around Dubai Marina followed by Arabic coffee and conversations.",
     location: "Dubai Marina Promenade, Near Pier 7",
     city: "Dubai",
     event_date: new Date(Date.now() + 86400000 * 3).toISOString(),

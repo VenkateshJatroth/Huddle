@@ -1,24 +1,24 @@
 {
   "expo": {
-    "name": "Gormati",
-    "slug": "gormati",
+    "name": "Huddle",
+    "slug": "huddle-social",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "gormati",
+    "icon": "./assets/icon.png",
+    "scheme": "huddle",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/icon.png",
+      "icon": "./assets/icon.png",
       "supportsTablet": false,
-      "bundleIdentifier": "com.gormati.app",
+      "bundleIdentifier": "com.venkateshjatroth.huddle",
       "infoPlist": {}
     },
     "android": {
-      "package": "com.gormati.app",
+      "package": "com.venkateshjatroth.huddle",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#000000",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
@@ -42,7 +42,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Gormati uses your photos to set your profile picture and gallery."
+          "photosPermission": "Huddle uses your photos to set your profile picture and gallery."
         }
       ],
       "expo-localization",
@@ -50,7 +50,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./assets/icon.png",
           "color": "#000000"
         }
       ],
