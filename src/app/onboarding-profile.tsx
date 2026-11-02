@@ -253,9 +253,11 @@ export default function OnboardingProfileScreen() {
         {/* Brand & Progress Header */}
         <View style={styles.header}>
           <View style={styles.brandRow}>
-            <View style={[styles.brandMark, { backgroundColor: colors.accent }]}>
-              <Icon name="sparkles" color="#FFFFFF" size={18} />
-            </View>
+            <Image
+              source={require("../../assets/logo.png")}
+              style={styles.brandLogo}
+              contentFit="cover"
+            />
             <View>
               <Text style={[styles.brandTitle, { color: colors.text }]}>Huddle</Text>
               <Text style={[styles.brandSubtitle, { color: colors.secondary }]}>
@@ -546,6 +548,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  brandLogo: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#000000",
   },
   brandMark: {
     width: 36,

@@ -156,9 +156,11 @@ export default function OnboardingScreen() {
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         {/* Header Branding */}
         <View style={styles.brandRow}>
-          <View style={[styles.brandMark, { backgroundColor: colors.accent }]}>
-            <Icon name="sparkles" color="#FFFFFF" size={18} />
-          </View>
+          <Image
+            source={require("../../assets/logo.png")}
+            style={styles.brandLogo}
+            resizeMode="cover"
+          />
           <Text style={[styles.brandTitle, { color: colors.text }]}>Huddle</Text>
         </View>
 
@@ -385,6 +387,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   container: { padding: 20, gap: 16, paddingTop: 40 },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 10, alignSelf: "center", marginBottom: 8 },
+  brandLogo: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#000000" },
   brandMark: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   brandTitle: { fontSize: 20, fontWeight: "800", letterSpacing: -0.4 },
   progressRow: { flexDirection: "row", gap: 8, marginBottom: 4 },

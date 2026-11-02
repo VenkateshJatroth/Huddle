@@ -7,6 +7,11 @@
     "icon": "./assets/icon.png",
     "scheme": "huddle",
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
     "ios": {
       "icon": "./assets/icon.png",
       "supportsTablet": false,
@@ -34,8 +39,9 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#000000",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 100
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "imageWidth": 200
         }
       ],
       "expo-secure-store",

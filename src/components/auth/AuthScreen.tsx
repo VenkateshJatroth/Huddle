@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocalSearchParams } from "expo-router";
 import {
   Alert,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -385,12 +386,14 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
   return (
     <AppScreen>
       <View style={styles.brandRow}>
-        <View style={[styles.brandMark, { backgroundColor: colors.accent }]}>
-          <Icon name="sparkles" color="#FFFFFF" size={18} />
-        </View>
+        <Image
+          source={require("../../../assets/logo.png")}
+          style={styles.brandLogo}
+          resizeMode="cover"
+        />
         <View style={styles.brandText}>
           <Text style={[styles.brandName, { color: colors.text }]}>Huddle</Text>
-          <Text style={[styles.brandSubtitle, { color: colors.secondary }]}>Your people, your place</Text>
+          <Text style={[styles.brandSubtitle, { color: colors.secondary }]}>{"Let's connect"}</Text>
         </View>
       </View>
 
@@ -750,7 +753,8 @@ function getAuthErrorMessage(error: unknown, isSignUp: boolean): string {
 }
 
 const styles = StyleSheet.create({
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 11 },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  brandLogo: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#000000" },
   brandMark: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   brandText: { flex: 1, gap: 2 },
   brandName: { fontSize: 20, fontWeight: "800", letterSpacing: -0.4 },
