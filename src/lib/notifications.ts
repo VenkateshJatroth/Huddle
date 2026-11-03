@@ -91,6 +91,7 @@ export async function fetchNotifications(userId: string): Promise<InAppNotificat
 
     return (data as any[]).map((n) => ({
       ...n,
+      actor_name: n.actor_name || "Huddle Member",
       time: formatTimeAgo(n.created_at),
     }));
   } catch {

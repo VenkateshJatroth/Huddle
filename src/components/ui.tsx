@@ -66,14 +66,14 @@ export function SectionHeading({ title, action }: { title: string; action?: Reac
 }
 
 export function Avatar({
-  name,
+  name = "User",
   tone = 0,
   size = 44,
   imageSource,
   imageKey,
   imageTileIndex,
 }: {
-  name: string;
+  name?: string | null;
   tone?: number;
   size?: number;
   imageSource?: ImageSource | string | number;
@@ -82,15 +82,17 @@ export function Avatar({
 }) {
   const colors = useAppColors();
   const [failedImageKey, setFailedImageKey] = useState<string>();
-  const initials = name
+  const safeName = typeof name === "string" && name.trim() ? name.trim() : "User";
+  const initials = safeName
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0])
     .join("")
-    .toUpperCase();
-  const backgroundColor = colors.avatarBackgrounds[tone % colors.avatarBackgrounds.length];
-  const resolvedImageKey = imageKey ?? name;
+    .toUpperCase() || "U";
+  const safeTone = Math.abs(tone || 0);
+  const backgroundColor = colors.avatarBackgrounds[safeTone % colors.avatarBackgrounds.length];
+  const resolvedImageKey = imageKey ?? safeName;
   const showImage = imageSource !== undefined && failedImageKey !== resolvedImageKey;
   const imageArea = Math.max(size - 4, 0);
   const isImageSheet = imageTileIndex !== undefined;

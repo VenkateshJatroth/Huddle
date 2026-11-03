@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  FlatList,
   Modal,
   Pressable,
   Share,
@@ -25,7 +27,7 @@ import {
   uploadProfileImage,
 } from "../../lib/gormati-profiles";
 import type { GormatiProfile, GormatiProfileDraft } from "../../lib/gormati-profiles";
-import { deleteUserAccount } from "../../lib/safety";
+
 import { useAuth } from "../../auth/AuthProvider";
 import { DemoAvatar } from "../../components/DemoAvatar";
 import { FeedPostCard } from "../../components/FeedPostCard";
@@ -63,11 +65,9 @@ import { profilePosts } from "../../data/mockData";
 import { demoProfilePostDescriptions, demoProfilePostImages } from "../../data/mockMedia";
 import {
   fetchRelationshipCounts,
-  relationshipErrorMessage,
-  RelationshipSchemaUnavailableError,
+  fetchRelationshipMembers,
 } from "../../lib/relationships";
-import type { RelationshipCounts } from "../../lib/relationships";
-import { supabase } from "../../lib/supabase";
+import type { RelationshipCounts, RelationshipProfileSummary } from "../../lib/relationships";
 import { useAppColors } from "../../theme/colors";
 
 type ProfileLoadState = "loading" | "ready" | "missing" | "table-missing" | "error";
@@ -160,12 +160,15 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [connectionsModalVisible, setConnectionsModalVisible] = useState(false);
+  const [connectionsModalTab, setConnectionsModalTab] = useState<"followers" | "following">("followers");
+  const [membersList, setMembersList] = useState<{
+    followers: RelationshipProfileSummary[];
+    following: RelationshipProfileSummary[];
+  }>({ followers: [], following: [] });
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [relationshipCounts, setRelationshipCounts] = useState<RelationshipCounts | null>(null);
-  const [relationshipCountState, setRelationshipCountState] = useState<"loading" | "ready" | "unavailable" | "error">("loading");
-  const [relationshipCountError, setRelationshipCountError] = useState<string | null>(null);
   const [userCreatedPosts, setUserCreatedPosts] = useState<PublishedPost[]>([]);
   const [editingPost, setEditingPost] = useState<PublishedPost | null>(null);
   const [editText, setEditText] = useState("");
@@ -252,20 +255,15 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
 
   useFocusEffect(useCallback(() => {
     let isCurrent = true;
-    setRelationshipCountState("loading");
-    setRelationshipCountError(null);
 
     void fetchRelationshipCounts(user.id)
       .then((counts) => {
         if (!isCurrent) return;
         setRelationshipCounts(counts);
-        setRelationshipCountState("ready");
       })
-      .catch((error: unknown) => {
+      .catch(() => {
         if (!isCurrent) return;
-        setRelationshipCounts(null);
-        setRelationshipCountError(relationshipErrorMessage(error));
-        setRelationshipCountState(error instanceof RelationshipSchemaUnavailableError ? "unavailable" : "error");
+        setRelationshipCounts({ followers: 0, following: 0 });
       });
 
     return () => { isCurrent = false; };
@@ -277,62 +275,20 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
     setReloadKey((value) => value + 1);
   }
 
-  async function signOut() {
-    if (isSigningOut) return;
-    setIsSigningOut(true);
-    setSignOutError(null);
+  const openConnectionsModal = async (tab: "followers" | "following") => {
+    setConnectionsModalTab(tab);
+    setMemberSearchQuery("");
+    setConnectionsModalVisible(true);
+    setLoadingMembers(true);
     try {
-      const { error } = await supabase.auth.signOut({ scope: "local" });
-      if (error) setSignOutError("We couldn't sign out. Check your connection and try again.");
+      const data = await fetchRelationshipMembers(user.id);
+      setMembersList(data);
     } catch {
-      setSignOutError("We couldn't sign out. Check your connection and try again.");
+      // Safe fallback
     } finally {
-      setIsSigningOut(false);
+      setLoadingMembers(false);
     }
-  }
-
-  function promptDeleteAccount() {
-    Alert.alert(
-      "Delete Account Permanently?",
-      "Are you sure you want to permanently delete your Huddle account? All your profile information, photos, matches, prompts, and message history will be immediately deleted. This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete My Account",
-          style: "destructive",
-          onPress: () => {
-            void executeDeleteAccount();
-          },
-        },
-      ],
-    );
-  }
-
-  async function executeDeleteAccount() {
-    if (isDeletingAccount) return;
-    setIsDeletingAccount(true);
-    try {
-      const res = await deleteUserAccount(user.id);
-      if (res.success) {
-        Alert.alert(
-          "Account Deleted",
-          "Your Huddle account and all associated data have been permanently removed.",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                router.replace("/(auth)" as never);
-              },
-            },
-          ],
-        );
-      } else {
-        Alert.alert("Deletion Failed", res.error ?? "Failed to delete account. Please try again.");
-      }
-    } finally {
-      setIsDeletingAccount(false);
-    }
-  }
+  };
 
   const handleOpenEdit = (post: PublishedPost) => {
     setEditingPost(post);
@@ -473,44 +429,25 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
 
   return (
     <AppScreen>
-      <PageHeading
-        title="Profile"
-        subtitle="Your story, shared with your community."
-        eyebrow="A little about you"
-        trailing={
-          <IconButton
-            name="settings"
-            label="Settings"
-            onPress={() => router.push("/settings" as never)}
-          />
-        }
-      />
-
-      <Card style={styles.accountCard}>
-        <View style={styles.accountCopy}>
-          <Text style={[styles.accountTitle, { color: colors.text }]}>Signed-in account</Text>
-          <Text style={[styles.accountEmail, { color: colors.secondary }]}>{user.email ?? "Email unavailable"}</Text>
-        </View>
-        <View style={styles.accountButtonRow}>
-          <AppButton
-            label={isSigningOut ? "Signing out…" : "Sign out"}
-            variant="outline"
-            disabled={isSigningOut || isDeletingAccount}
-            onPress={() => { void signOut(); }}
-          />
-          <AppButton
-            label={isDeletingAccount ? "Deleting…" : "Delete account"}
-            variant="subtle"
-            disabled={isSigningOut || isDeletingAccount}
-            onPress={promptDeleteAccount}
-          />
-        </View>
-        {signOutError ? (
-          <Text accessibilityLiveRegion="polite" style={[styles.signOutError, { color: colors.text }]}>
-            {signOutError}
+      {/* 1. Instagram-Style Top Bar */}
+      <View style={styles.igTopBar}>
+        <View style={styles.igTopBarLeft}>
+          <Text style={[styles.igTopBarUsername, { color: colors.text }]}>
+            @{profile?.username || user.email?.split("@")[0] || "member"}
           </Text>
-        ) : null}
-      </Card>
+          {profile?.is_verified ? (
+            <Icon name="check" color={colors.accent} size={15} />
+          ) : null}
+          {profile?.is_private ? (
+            <Icon name="lock" color={colors.secondary} size={14} />
+          ) : null}
+        </View>
+        <IconButton
+          name="settings"
+          label="Settings"
+          onPress={() => router.push("/settings" as never)}
+        />
+      </View>
 
       {loadState === "loading" ? (
         <Card><MutedText>Loading your profile…</MutedText></Card>
@@ -556,141 +493,139 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
 
       {profile ? (
         <>
-          {/* Avatar with tap-to-change */}
-          <Card style={styles.profileCard}>
-            <View style={styles.profileTop}>
+          {/* Instagram-Style Profile Header Card */}
+          <Card style={styles.igProfileCard}>
+            <View style={styles.igHeaderRow}>
+              {/* Avatar with tap-to-change photo */}
               <Pressable
                 onPress={() => { void pickAndUploadAvatar(); }}
                 accessibilityLabel="Change profile photo"
-                style={styles.avatarWrap}
+                style={styles.igAvatarWrap}
               >
                 <Avatar
                   name={profile.display_name}
                   tone={1}
-                  size={82}
+                  size={84}
                   imageSource={profile.avatar_url ? { uri: profile.avatar_url } : undefined}
                   imageKey={profile.avatar_url ?? profile.id}
                 />
-                <View style={[styles.avatarOverlay, { backgroundColor: colors.accent }]}>
-                  <Text style={styles.avatarOverlayText}>
-                    {isUploadingPhoto ? "…" : "✎"}
+                <View style={[styles.igAvatarBadge, { backgroundColor: colors.accent }]}>
+                  <Text style={styles.igAvatarBadgeText}>
+                    {isUploadingPhoto ? "…" : "+"}
                   </Text>
                 </View>
               </Pressable>
-              <View style={styles.identity}>
-                <Text style={[styles.name, { color: colors.text }]}>{profile.display_name}</Text>
-                <Text style={[styles.handle, { color: colors.secondary }]}>@{profile.username}</Text>
-                {profile.is_verified ? (
-                  <Text style={[styles.verifiedBadge, { color: colors.success }]}>✓ Verified</Text>
-                ) : null}
-                <Text style={[styles.privacyLabel, { color: colors.secondary }]}>
-                  {profile.is_private ? "Private profile" : "Public to Huddle members"}
-                </Text>
+
+              {/* Stats Columns: Posts | Followers | Following */}
+              <View style={styles.igStatsRow}>
+                <Pressable
+                  style={styles.igStatItem}
+                  onPress={() => setActiveSection("Posts")}
+                  accessibilityRole="button"
+                  accessibilityLabel="View your posts"
+                >
+                  <Text style={[styles.igStatNumber, { color: colors.text }]}>
+                    {userCreatedPosts.length}
+                  </Text>
+                  <Text style={[styles.igStatLabel, { color: colors.secondary }]}>Posts</Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.igStatItem}
+                  onPress={() => { void openConnectionsModal("followers"); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="View followers list"
+                >
+                  <Text style={[styles.igStatNumber, { color: colors.text }]}>
+                    {relationshipCounts?.followers ?? 0}
+                  </Text>
+                  <Text style={[styles.igStatLabel, { color: colors.secondary }]}>Followers</Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.igStatItem}
+                  onPress={() => { void openConnectionsModal("following"); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="View following list"
+                >
+                  <Text style={[styles.igStatNumber, { color: colors.text }]}>
+                    {relationshipCounts?.following ?? 0}
+                  </Text>
+                  <Text style={[styles.igStatLabel, { color: colors.secondary }]}>Following</Text>
+                </Pressable>
               </View>
             </View>
 
-            {profile.bio ? (
-              <Text style={[styles.bio, { color: colors.text }]}>{profile.bio}</Text>
-            ) : null}
+            {/* Display Name, Handle & Bio */}
+            <View style={styles.igBioSection}>
+              <Text style={[styles.igDisplayName, { color: colors.text }]}>
+                {profile.display_name}
+              </Text>
+              <Text style={[styles.igHandle, { color: colors.secondary }]}>
+                @{profile.username}
+              </Text>
 
-            {/* Live profile details */}
-            {(profile.location || profile.dating_intention || profile.age) ? (
-              <View style={styles.detailRow}>
-                {profile.age ? (
-                  <View style={styles.infoItem}>
-                    <Text style={[styles.infoLabel, { color: colors.secondary }]}>Age</Text>
-                    <Text style={[styles.infoValue, { color: colors.text }]}>{profile.age}</Text>
-                  </View>
-                ) : null}
-                {profile.location ? (
-                  <View style={styles.infoItem}>
-                    <Text style={[styles.infoLabel, { color: colors.secondary }]}>Location</Text>
-                    <Text style={[styles.infoValue, { color: colors.text }]}>{profile.location}</Text>
-                  </View>
-                ) : null}
-                {profile.dating_intention ? (
-                  <View style={styles.infoItem}>
-                    <Text style={[styles.infoLabel, { color: colors.secondary }]}>Looking for</Text>
-                    <Text style={[styles.infoValue, { color: colors.text }]}>{profile.dating_intention}</Text>
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
+              {profile.bio ? (
+                <Text style={[styles.igBioText, { color: colors.text }]}>
+                  {profile.bio}
+                </Text>
+              ) : null}
 
-            {/* Interests chips */}
-            {Array.isArray(profile.interests) && (profile.interests as string[]).length > 0 ? (
-              <View style={styles.interests}>
-                <Text style={[styles.infoLabel, { color: colors.secondary }]}>Interests</Text>
-                <View style={styles.chips}>
-                  {(profile.interests as string[]).map((interest) => (
-                    <ChoiceChip key={interest} label={interest} />
-                  ))}
+              {/* Details Pills: Location, Age, Looking For */}
+              {(profile.location || profile.dating_intention || profile.age) ? (
+                <View style={styles.igDetailsPills}>
+                  {profile.location ? (
+                    <View style={[styles.igPill, { backgroundColor: colors.subtle }]}>
+                      <Icon name="location" color={colors.accent} size={12} />
+                      <Text style={[styles.igPillText, { color: colors.text }]}>{profile.location}</Text>
+                    </View>
+                  ) : null}
+                  {profile.age ? (
+                    <View style={[styles.igPill, { backgroundColor: colors.subtle }]}>
+                      <Text style={[styles.igPillText, { color: colors.text }]}>{profile.age} yrs</Text>
+                    </View>
+                  ) : null}
+                  {profile.dating_intention ? (
+                    <View style={[styles.igPill, { backgroundColor: colors.subtle }]}>
+                      <Icon name="heart" color={colors.accent} size={12} />
+                      <Text style={[styles.igPillText, { color: colors.text }]}>{profile.dating_intention}</Text>
+                    </View>
+                  ) : null}
                 </View>
-              </View>
-            ) : null}
+              ) : null}
+            </View>
 
-            {/* Prompts Cards */}
-            {Array.isArray(profile.prompts) && (profile.prompts as { question: string; answer: string }[]).length > 0 ? (
-              <View style={styles.promptsBlock}>
-                <Text style={[styles.infoLabel, { color: colors.secondary }]}>Prompts</Text>
-                {(profile.prompts as { question: string; answer: string }[]).map((prompt, idx) => (
-                  <View
-                    key={idx}
-                    style={[styles.promptCard, { backgroundColor: colors.subtle, borderColor: colors.border }]}
-                  >
-                    <Text style={[styles.promptQuestion, { color: colors.secondary }]}>
-                      {prompt.question}
-                    </Text>
-                    <Text style={[styles.promptAnswer, { color: colors.text }]}>
-                      {prompt.answer}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
-            <View style={styles.profileActions}>
-              <AppButton label="Edit profile" variant="outline" onPress={startEditing} />
-              <AppButton
-                label="Share profile"
-                variant="subtle"
-                icon="share"
+            {/* Action Buttons: Edit Profile & Share Profile */}
+            <View style={styles.igActionsRow}>
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.igActionButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                onPress={startEditing}
+              >
+                <Text style={[styles.igActionButtonText, { color: colors.text }]}>Edit Profile</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.igShareButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
                 onPress={() => { void handleShareProfile(); }}
-              />
+              >
+                <Icon name="share" color={colors.text} size={16} />
+              </Pressable>
             </View>
           </Card>
 
           {/* 15-Second Voice Introduction */}
           <VoiceIntroCard
+            userId={user.id}
             voiceUrl={profile.voice_intro_url}
             durationSec={profile.voice_duration_sec || 15}
             isOwner
-            onRecordNew={() => {
-              Alert.alert("Voice Intro Saved", "Your 15-second voice introduction is saved to your profile.");
+            onVoiceSaved={(newUrl, dur) => {
+              setProfile((prev) =>
+                prev ? { ...prev, voice_intro_url: newUrl, voice_duration_sec: dur } : prev,
+              );
             }}
           />
-
-          {relationshipCountState === "ready" && relationshipCounts ? (
-            <Card style={styles.connectionStats}>
-              <SectionHeading title="Connections" />
-              <View style={styles.connectionStatRow}>
-                <View style={styles.connectionStat}>
-                  <Text style={[styles.connectionStatValue, { color: colors.text }]}>{relationshipCounts.followers}</Text>
-                  <Text style={[styles.connectionStatLabel, { color: colors.secondary }]}>Followers</Text>
-                </View>
-                <View style={styles.connectionStat}>
-                  <Text style={[styles.connectionStatValue, { color: colors.text }]}>{relationshipCounts.following}</Text>
-                  <Text style={[styles.connectionStatLabel, { color: colors.secondary }]}>Following</Text>
-                </View>
-              </View>
-            </Card>
-          ) : null}
-          {relationshipCountState === "unavailable" ? (
-            <LocalPreviewNotice>Follower and following counts will appear after the reviewed follow relationship migration is applied to a staging database.</LocalPreviewNotice>
-          ) : null}
-          {relationshipCountState === "error" ? (
-            <Text accessibilityLiveRegion="polite" style={[styles.errorText, { color: colors.accentStrong }]}>{relationshipCountError}</Text>
-          ) : null}
         </>
       ) : loadState !== "loading" ? (
         <SampleProfileCard
@@ -718,14 +653,18 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
             maxLength={80}
           />
           <ProfileField
-            label="Username"
+            label="Username (Handle)"
             value={draft.username}
-            onChangeText={(username) => setDraft((d) => ({ ...d, username }))}
+            onChangeText={(username) => {
+              const clean = username.toLowerCase().replace(/[^a-z0-9._]/g, "");
+              setDraft((d) => ({ ...d, username: clean }));
+            }}
             accessibilityLabel="Username"
-            maxLength={40}
+            maxLength={30}
             autoCapitalize="none"
             autoCorrect={false}
             prefix="@"
+            helper="Your custom Instagram-style handle (e.g. @alex.travels)"
           />
           <ProfileField
             label="Bio"
@@ -1000,14 +939,249 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
           </Card>
         </View>
       ) : (
-        <Card style={styles.aboutCard}>
-          <SectionHeading title="About · sample" />
-          <Text style={[styles.aboutText, { color: colors.text }]}>
-            {"I'm happiest when I'm discovering a neighborhood on foot, hearing a new artist, or learning the story behind a familiar place. I'm here to meet curious people close to home."}
-          </Text>
-          <LocalPreviewNotice>This about text is sample content and is not part of your saved profile.</LocalPreviewNotice>
-        </Card>
+        <View style={{ gap: 14 }}>
+          {/* Bio & Overview */}
+          <Card style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <SectionHeading title="Bio & Story" />
+            <Text style={[styles.aboutText, { color: colors.text }]}>
+              {profile?.bio || "No bio added yet. Tap Edit Profile to share a few words about yourself."}
+            </Text>
+          </Card>
+
+          {/* Core Profile Details */}
+          <Card style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <SectionHeading title="Details" />
+            <View style={styles.aboutDetailsList}>
+              <View style={styles.aboutDetailRow}>
+                <Text style={[styles.aboutDetailLabel, { color: colors.secondary }]}>Display Name</Text>
+                <Text style={[styles.aboutDetailValue, { color: colors.text }]}>{profile?.display_name || "—"}</Text>
+              </View>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <View style={styles.aboutDetailRow}>
+                <Text style={[styles.aboutDetailLabel, { color: colors.secondary }]}>Username</Text>
+                <Text style={[styles.aboutDetailValue, { color: colors.accent }]}>@{profile?.username || "—"}</Text>
+              </View>
+              {profile?.location ? (
+                <>
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                  <View style={styles.aboutDetailRow}>
+                    <Text style={[styles.aboutDetailLabel, { color: colors.secondary }]}>Location</Text>
+                    <Text style={[styles.aboutDetailValue, { color: colors.text }]}>{profile.location}</Text>
+                  </View>
+                </>
+              ) : null}
+              {profile?.age ? (
+                <>
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                  <View style={styles.aboutDetailRow}>
+                    <Text style={[styles.aboutDetailLabel, { color: colors.secondary }]}>Age</Text>
+                    <Text style={[styles.aboutDetailValue, { color: colors.text }]}>{profile.age} years</Text>
+                  </View>
+                </>
+              ) : null}
+              {profile?.dating_intention ? (
+                <>
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                  <View style={styles.aboutDetailRow}>
+                    <Text style={[styles.aboutDetailLabel, { color: colors.secondary }]}>Looking For</Text>
+                    <Text style={[styles.aboutDetailValue, { color: colors.text }]}>{profile.dating_intention}</Text>
+                  </View>
+                </>
+              ) : null}
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <View style={styles.aboutDetailRow}>
+                <Text style={[styles.aboutDetailLabel, { color: colors.secondary }]}>Profile Visibility</Text>
+                <Text style={[styles.aboutDetailValue, { color: colors.text }]}>
+                  {profile?.is_private ? "Private" : "Public"}
+                </Text>
+              </View>
+            </View>
+          </Card>
+
+          {/* Interests */}
+          {Array.isArray(profile?.interests) && (profile.interests as string[]).length > 0 ? (
+            <Card style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <SectionHeading title="Interests & Passions" />
+              <View style={styles.chips}>
+                {(profile.interests as string[]).map((interest) => (
+                  <ChoiceChip key={interest} label={interest} />
+                ))}
+              </View>
+            </Card>
+          ) : null}
+
+          {/* Prompts */}
+          {Array.isArray(profile?.prompts) && (profile.prompts as { question: string; answer: string }[]).length > 0 ? (
+            <Card style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <SectionHeading title="Huddle Prompts" />
+              <View style={{ gap: 10 }}>
+                {(profile.prompts as { question: string; answer: string }[]).map((prompt, idx) => (
+                  <View
+                    key={idx}
+                    style={[styles.promptCard, { backgroundColor: colors.subtle, borderColor: colors.border }]}
+                  >
+                    <Text style={[styles.promptQuestion, { color: colors.secondary }]}>
+                      {prompt.question}
+                    </Text>
+                    <Text style={[styles.promptAnswer, { color: colors.text }]}>
+                      {prompt.answer}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </Card>
+          ) : null}
+        </View>
       )}
+
+      {/* Interactive Followers / Following List Modal */}
+      <Modal
+        visible={connectionsModalVisible}
+        animationType="slide"
+        onRequestClose={() => setConnectionsModalVisible(false)}
+      >
+        <View style={[styles.connectionsModalScreen, { backgroundColor: colors.background }]}>
+          {/* Modal Header */}
+          <View style={[styles.connectionsModalHeader, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
+            <Text style={[styles.connectionsModalTitle, { color: colors.text }]}>
+              {connectionsModalTab === "followers" ? "Followers" : "Following"}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              onPress={() => setConnectionsModalVisible(false)}
+              hitSlop={10}
+              style={styles.connectionsCloseBtn}
+            >
+              <Icon name="close" color={colors.text} size={22} />
+            </Pressable>
+          </View>
+
+          {/* Segmented Control / Tabs */}
+          <View style={[styles.connectionsTabRow, { borderBottomColor: colors.border }]}>
+            <Pressable
+              style={[
+                styles.connectionsTabBtn,
+                connectionsModalTab === "followers" && { borderBottomColor: colors.accent, borderBottomWidth: 2 },
+              ]}
+              onPress={() => setConnectionsModalTab("followers")}
+            >
+              <Text
+                style={[
+                  styles.connectionsTabBtnText,
+                  { color: connectionsModalTab === "followers" ? colors.accent : colors.secondary },
+                ]}
+              >
+                {relationshipCounts?.followers ?? membersList.followers.length} Followers
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.connectionsTabBtn,
+                connectionsModalTab === "following" && { borderBottomColor: colors.accent, borderBottomWidth: 2 },
+              ]}
+              onPress={() => setConnectionsModalTab("following")}
+            >
+              <Text
+                style={[
+                  styles.connectionsTabBtnText,
+                  { color: connectionsModalTab === "following" ? colors.accent : colors.secondary },
+                ]}
+              >
+                {relationshipCounts?.following ?? membersList.following.length} Following
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Search Bar */}
+          <View style={[styles.connectionsSearchWrap, { backgroundColor: colors.subtle, borderColor: colors.border }]}>
+            <Icon name="search" color={colors.secondary} size={18} />
+            <TextInput
+              style={[styles.connectionsSearchInput, { color: colors.text }]}
+              placeholder={`Search ${connectionsModalTab}…`}
+              placeholderTextColor={colors.secondary}
+              value={memberSearchQuery}
+              onChangeText={setMemberSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {memberSearchQuery ? (
+              <Pressable onPress={() => setMemberSearchQuery("")}>
+                <Icon name="close" color={colors.secondary} size={16} />
+              </Pressable>
+            ) : null}
+          </View>
+
+          {/* Members List */}
+          {loadingMembers ? (
+            <View style={styles.connectionsLoading}>
+              <ActivityIndicator color={colors.accent} size="large" />
+              <Text style={[styles.connectionsLoadingText, { color: colors.secondary }]}>
+                Loading {connectionsModalTab}…
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={(connectionsModalTab === "followers" ? membersList.followers : membersList.following).filter((m) => {
+                if (!memberSearchQuery.trim()) return true;
+                const query = memberSearchQuery.toLowerCase();
+                return (
+                  m.display_name?.toLowerCase().includes(query) ||
+                  m.username?.toLowerCase().includes(query)
+                );
+              })}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.connectionsListContent}
+              ListEmptyComponent={
+                <View style={styles.connectionsEmptyWrap}>
+                  <Icon name="people" color={colors.secondary} size={40} />
+                  <Text style={[styles.connectionsEmptyTitle, { color: colors.text }]}>
+                    No {connectionsModalTab} yet
+                  </Text>
+                  <Text style={[styles.connectionsEmptySubtitle, { color: colors.secondary }]}>
+                    {connectionsModalTab === "followers"
+                      ? "When other members follow you on Huddle, they'll appear here."
+                      : "Explore and connect with community members to see them here."}
+                  </Text>
+                </View>
+              }
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[styles.connectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => {
+                    setConnectionsModalVisible(false);
+                    router.push(("/member/" + item.id) as never);
+                  }}
+                >
+                  <Avatar
+                    name={item.display_name}
+                    tone={item.display_name.length % 5}
+                    size={46}
+                    imageSource={item.avatar_url ? { uri: item.avatar_url } : undefined}
+                  />
+                  <View style={styles.connectionCardInfo}>
+                    <Text numberOfLines={1} style={[styles.connectionCardName, { color: colors.text }]}>
+                      {item.display_name}
+                    </Text>
+                    <Text numberOfLines={1} style={[styles.connectionCardHandle, { color: colors.secondary }]}>
+                      @{item.username}
+                    </Text>
+                    {item.bio ? (
+                      <Text numberOfLines={1} style={[styles.connectionCardBio, { color: colors.secondary }]}>
+                        {item.bio}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={[styles.viewProfileBtn, { borderColor: colors.border }]}>
+                    <Text style={[styles.viewProfileBtnText, { color: colors.accent }]}>View</Text>
+                  </View>
+                </Pressable>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
 
       {/* Edit Post Modal */}
       <Modal
@@ -1342,5 +1516,270 @@ const styles = StyleSheet.create({
   badgeItemDesc: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  // Instagram Redesign Styles
+  igTopBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  igTopBarLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  igTopBarUsername: {
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+  },
+  igProfileCard: {
+    padding: 16,
+    gap: 14,
+  },
+  igHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 20,
+  },
+  igAvatarWrap: {
+    position: "relative",
+  },
+  igAvatarBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#000000",
+  },
+  igAvatarBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: -1,
+  },
+  igStatsRow: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+  },
+  igStatItem: {
+    alignItems: "center",
+    gap: 3,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  igStatNumber: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  igStatLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  igBioSection: {
+    gap: 4,
+  },
+  igDisplayName: {
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+  igHandle: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  igBioText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  igDetailsPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 6,
+  },
+  igPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  igPillText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  igActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+  },
+  igActionButton: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  igActionButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  igShareButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aboutDetailsList: {
+    gap: 10,
+  },
+  aboutDetailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 2,
+  },
+  aboutDetailLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  aboutDetailValue: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    width: "100%",
+  },
+
+  // Connections Modal Styles
+  connectionsModalScreen: {
+    flex: 1,
+  },
+  connectionsModalHeader: {
+    height: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  connectionsModalTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  connectionsCloseBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  connectionsTabRow: {
+    flexDirection: "row",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  connectionsTabBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  connectionsTabBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  connectionsSearchWrap: {
+    margin: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  connectionsSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  connectionsLoading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 40,
+  },
+  connectionsLoadingText: {
+    fontSize: 13,
+  },
+  connectionsListContent: {
+    padding: 12,
+    gap: 8,
+  },
+  connectionsEmptyWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 30,
+    gap: 10,
+  },
+  connectionsEmptyTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  connectionsEmptySubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+  },
+  connectionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  connectionCardInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  connectionCardName: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  connectionCardHandle: {
+    fontSize: 12,
+  },
+  connectionCardBio: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  viewProfileBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  viewProfileBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

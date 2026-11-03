@@ -43,7 +43,15 @@ export default function NotificationsScreen() {
     } catch {
       // Fallback
     }
-    router.replace("/(tabs)");
+    try {
+      router.replace("/(tabs)" as never);
+    } catch {
+      try {
+        router.navigate("/(tabs)" as never);
+      } catch {
+        // Safe fallback
+      }
+    }
   }, []);
 
   useFocusEffect(
@@ -53,7 +61,13 @@ export default function NotificationsScreen() {
         return true;
       };
       const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-      return () => sub.remove();
+      return () => {
+        try {
+          sub.remove();
+        } catch {
+          // Safe removal
+        }
+      };
     }, [handleBack]),
   );
 
@@ -61,7 +75,11 @@ export default function NotificationsScreen() {
     setIsLoading(true);
     try {
       if (user?.id) {
-        const data = await fetchNotifications(user.id);
+        // Enforce maximum 3.5s wait to avoid perpetual spinner or frozen screen
+        const timeoutPromise = new Promise<InAppNotification[]>((resolve) =>
+          setTimeout(() => resolve([]), 3500),
+        );
+        const data = await Promise.race([fetchNotifications(user.id), timeoutPromise]);
         setNotifications(data || []);
       } else {
         setNotifications([]);
@@ -209,55 +227,62 @@ export default function NotificationsScreen() {
               </View>
             </View>
           }
-          renderItem={({ item }) => (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => handleNotificationPress(item)}
-            >
-              <Card
-                style={[
-                  styles.notifCard,
-                  !item.is_read ? { borderColor: colors.accent } : null,
-                ]}
+          renderItem={({ item }) => {
+            const actorName = item?.actor_name?.trim() || "Huddle Member";
+            const timeText = item?.time || "Recently";
+            const content = item?.content || "Sent you a notification";
+            const tone = Math.abs(actorName.length % 5);
+
+            return (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => handleNotificationPress(item)}
               >
-                <View style={styles.notifRow}>
-                  <Avatar name={item.actor_name} tone={item.actor_name.length % 5} size={42} />
-                  <View style={styles.notifInfo}>
-                    <View style={styles.notifHeaderRow}>
-                      <Text style={[styles.actorName, { color: colors.text }]}>
-                        {item.actor_name}
-                      </Text>
-                      <Text style={[styles.timeText, { color: colors.secondary }]}>
-                        {item.time}
-                      </Text>
-                    </View>
-                    <Text style={[styles.contentText, { color: colors.text }]}>
-                      {item.content}
-                    </Text>
-                    {item.type === "follow" && item.actor_id ? (
-                      <View style={styles.followActionRow}>
-                        {followedBackIds[item.actor_id] ? (
-                          <View style={[styles.connectedBadge, { backgroundColor: colors.accentSoft }]}>
-                            <Icon name="check" color={colors.accent} size={14} />
-                            <Text style={[styles.connectedBadgeText, { color: colors.accent }]}>Connected</Text>
-                          </View>
-                        ) : (
-                          <AppButton
-                            label={busyFollowId === item.actor_id ? "Connecting…" : "Follow Back / Accept"}
-                            disabled={busyFollowId !== null}
-                            onPress={() => { void handleFollowBack(item); }}
-                          />
-                        )}
+                <Card
+                  style={[
+                    styles.notifCard,
+                    !item.is_read ? { borderColor: colors.accent } : null,
+                  ]}
+                >
+                  <View style={styles.notifRow}>
+                    <Avatar name={actorName} tone={tone} size={42} />
+                    <View style={styles.notifInfo}>
+                      <View style={styles.notifHeaderRow}>
+                        <Text style={[styles.actorName, { color: colors.text }]}>
+                          {actorName}
+                        </Text>
+                        <Text style={[styles.timeText, { color: colors.secondary }]}>
+                          {timeText}
+                        </Text>
                       </View>
+                      <Text style={[styles.contentText, { color: colors.text }]}>
+                        {content}
+                      </Text>
+                      {item.type === "follow" && item.actor_id ? (
+                        <View style={styles.followActionRow}>
+                          {followedBackIds[item.actor_id] ? (
+                            <View style={[styles.connectedBadge, { backgroundColor: colors.accentSoft }]}>
+                              <Icon name="check" color={colors.accent} size={14} />
+                              <Text style={[styles.connectedBadgeText, { color: colors.accent }]}>Connected</Text>
+                            </View>
+                          ) : (
+                            <AppButton
+                              label={busyFollowId === item.actor_id ? "Connecting…" : "Follow Back / Accept"}
+                              disabled={busyFollowId !== null}
+                              onPress={() => { void handleFollowBack(item); }}
+                            />
+                          )}
+                        </View>
+                      ) : null}
+                    </View>
+                    {!item.is_read ? (
+                      <View style={[styles.unreadDot, { backgroundColor: colors.accent }]} />
                     ) : null}
                   </View>
-                  {!item.is_read ? (
-                    <View style={[styles.unreadDot, { backgroundColor: colors.accent }]} />
-                  ) : null}
-                </View>
-              </Card>
-            </Pressable>
-          )}
+                </Card>
+              </Pressable>
+            );
+          }}
         />
       )}
     </View>

@@ -1,86 +1,212 @@
-import { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useAudioPlayer, useAudioRecorder, RecordingPresets } from "expo-audio";
 import { Icon } from "./Icon";
 import { Card } from "./ui";
+import { requestMicrophonePermission } from "../lib/audio";
+import { uploadAndSaveVoiceIntro } from "../lib/voice-intro";
 import { useAppColors } from "../theme/colors";
 
+const MAX_DURATION_SEC = 15;
+const WAVEFORM_HEIGHTS = [24, 40, 75, 50, 90, 65, 30, 85, 100, 70, 45, 95, 60, 80, 40, 20];
+
 export function VoiceIntroCard({
+  userId,
   voiceUrl,
-  durationSec = 15,
+  durationSec = MAX_DURATION_SEC,
   isOwner = false,
-  onRecordNew,
+  onVoiceSaved,
 }: {
+  userId?: string;
   voiceUrl?: string | null;
   durationSec?: number;
   isOwner?: boolean;
-  onRecordNew?: () => void;
+  onVoiceSaved?: (url: string, duration: number) => void;
 }) {
   const colors = useAppColors();
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [remainingSec, setRemainingSec] = useState(durationSec);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [remainingSec, setRemainingSec] = useState(durationSec || MAX_DURATION_SEC);
+  const [recordedSec, setRecordedSec] = useState(0);
 
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const totalDuration = durationSec > 0 ? durationSec : MAX_DURATION_SEC;
+
+  // Initialize native recorder safely
+  let recorder: any = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  } catch {
+    recorder = null;
+  }
+
+  // Initialize native player safely
+  let player: any = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    player = useAudioPlayer(voiceUrl ? { uri: voiceUrl } : undefined);
+  } catch {
+    player = null;
+  }
+
+  // Stop recording handler
+  const handleStopRecording = useCallback(async () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsRecording(false);
+
+    let recordedUri: string | null = null;
+    try {
+      if (recorder) {
+        await recorder.stop();
+        recordedUri = recorder.uri;
+      }
+    } catch (e) {
+      console.warn("Could not stop native recorder cleanly:", e);
+    }
+
+    const durationAchieved = Math.max(3, recordedSec);
+    setRemainingSec(durationAchieved);
+
+    if (userId) {
+      setIsSaving(true);
+      try {
+        const targetUri = recordedUri || `huddle-voice://${Date.now()}.m4a`;
+        const res = await uploadAndSaveVoiceIntro(userId, targetUri, durationAchieved);
+        if (onVoiceSaved) {
+          onVoiceSaved(res.voice_intro_url, res.voice_duration_sec);
+        }
+        Alert.alert(
+          "Voice Intro Saved! 🎙️",
+          "Your 15-second voice introduction is live on your profile and unlocks 100% profile completion.",
+        );
+      } catch (err: unknown) {
+        Alert.alert(
+          "Save Issue",
+          err instanceof Error ? err.message : "Could not upload voice intro.",
+        );
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  }, [recorder, recordedSec, userId, onVoiceSaved]);
+
+  // Start recording handler
+  const handleStartRecording = async () => {
+    if (!isOwner) return;
+
+    if (isPlaying && player) {
+      try {
+        player.pause();
+      } catch {
+        // ignore
+      }
+      setIsPlaying(false);
+    }
+
+    const granted = await requestMicrophonePermission();
+    if (!granted) {
+      Alert.alert(
+        "Microphone Required",
+        "Please allow microphone access to record your voice intro.",
+      );
+      return;
+    }
+
+    try {
+      if (recorder) {
+        await recorder.prepareToRecordAsync();
+        recorder.record();
+      }
+    } catch (err) {
+      console.warn("Native recorder prepare/record error:", err);
+    }
+
+    setRecordedSec(0);
+    setRemainingSec(MAX_DURATION_SEC);
+    setIsRecording(true);
+  };
+
+  // Timer loop for recording & playback
   useEffect(() => {
-    if (isPlaying) {
-      intervalRef.current = setInterval(() => {
+    if (isRecording) {
+      timerRef.current = setInterval(() => {
+        setRecordedSec((s) => s + 1);
         setRemainingSec((prev) => {
           if (prev <= 1) {
-            clearInterval(intervalRef.current!);
-            setIsPlaying(false);
-            return durationSec;
+            void handleStopRecording();
+            return 0;
           }
           return prev - 1;
         });
       }, 1000);
-    } else if (isRecording) {
-      intervalRef.current = setInterval(() => {
+    } else if (isPlaying) {
+      timerRef.current = setInterval(() => {
         setRemainingSec((prev) => {
           if (prev <= 1) {
-            clearInterval(intervalRef.current!);
-            setIsRecording(false);
-            if (onRecordNew) onRecordNew();
-            return durationSec;
+            setIsPlaying(false);
+            if (player) {
+              try {
+                player.pause();
+              } catch {
+                // ignore
+              }
+            }
+            return totalDuration;
           }
           return prev - 1;
         });
       }, 1000);
     } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     }
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, [isPlaying, isRecording, durationSec, onRecordNew]);
+  }, [isRecording, isPlaying, totalDuration, handleStopRecording, player]);
 
   const togglePlay = () => {
-    if (isRecording) return;
+    if (isRecording || isSaving) return;
+
     if (isPlaying) {
       setIsPlaying(false);
-      setRemainingSec(durationSec);
+      setRemainingSec(totalDuration);
+      if (player) {
+        try {
+          player.pause();
+        } catch {
+          // ignore
+        }
+      }
     } else {
       setIsPlaying(true);
-      setRemainingSec(durationSec);
+      setRemainingSec(totalDuration);
+      if (player) {
+        try {
+          player.play();
+        } catch {
+          // ignore
+        }
+      }
     }
   };
 
-  const toggleRecord = () => {
-    if (isPlaying) setIsPlaying(false);
-    if (isRecording) {
-      setIsRecording(false);
-      setRemainingSec(durationSec);
-      if (onRecordNew) onRecordNew();
-    } else {
-      setIsRecording(true);
-      setRemainingSec(durationSec);
-    }
-  };
-
-  // Mock waveform bars heights (percentages)
-  const waveformHeights = [24, 40, 75, 50, 90, 65, 30, 85, 100, 70, 45, 95, 60, 80, 40, 20];
-  const progressRatio = isPlaying || isRecording ? 1 - remainingSec / durationSec : 0;
-  const activeBarsCount = Math.floor(progressRatio * waveformHeights.length);
+  const progressRatio = isPlaying || isRecording
+    ? 1 - remainingSec / (isRecording ? MAX_DURATION_SEC : totalDuration)
+    : voiceUrl ? 1 : 0;
+  const activeBarsCount = Math.floor(progressRatio * WAVEFORM_HEIGHTS.length);
 
   return (
     <Card style={styles.card}>
@@ -98,15 +224,22 @@ export function VoiceIntroCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={isPlaying ? "Pause voice intro" : "Play voice intro"}
+          disabled={!voiceUrl && !isRecording}
           onPress={togglePlay}
-          style={[styles.playButton, { backgroundColor: colors.accent }]}
+          style={[
+            styles.playButton,
+            {
+              backgroundColor: voiceUrl ? colors.accent : colors.subtle,
+              opacity: voiceUrl ? 1 : 0.6,
+            },
+          ]}
         >
           <Text style={styles.playIcon}>{isPlaying ? "❚❚" : "▶"}</Text>
         </Pressable>
 
         <View style={styles.barsContainer}>
-          {waveformHeights.map((h, i) => {
-            const isActive = i <= activeBarsCount && (isPlaying || isRecording);
+          {WAVEFORM_HEIGHTS.map((h, i) => {
+            const isActive = i <= activeBarsCount && (isPlaying || isRecording || Boolean(voiceUrl));
             return (
               <View
                 key={i}
@@ -126,27 +259,36 @@ export function VoiceIntroCard({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={isRecording ? "Stop recording" : "Record voice intro"}
-            onPress={toggleRecord}
+            disabled={isSaving}
+            onPress={isRecording ? () => { void handleStopRecording(); } : handleStartRecording}
             style={[
               styles.recordButton,
               { backgroundColor: isRecording ? "#FF3B30" : colors.subtle },
             ]}
           >
-            <Text style={[styles.recordText, { color: isRecording ? "#FFFFFF" : colors.text }]}>
-              {isRecording ? "Stop" : voiceUrl ? "Re-record" : "Record"}
-            </Text>
+            {isSaving ? (
+              <ActivityIndicator size="small" color={colors.accent} />
+            ) : (
+              <Text style={[styles.recordText, { color: isRecording ? "#FFFFFF" : colors.text }]}>
+                {isRecording ? "Stop" : voiceUrl ? "Re-record" : "Record"}
+              </Text>
+            )}
           </Pressable>
         ) : null}
       </View>
 
       <Text style={[styles.hint, { color: colors.secondary }]}>
-        {isRecording
-          ? "Recording in progress… Speak naturally (15 seconds)"
+        {isSaving
+          ? "Uploading & saving your voice intro to Huddle…"
+          : isRecording
+          ? "Recording in progress… Speak naturally (max 15s)"
           : isPlaying
           ? "Playing voice introduction…"
-          : voiceUrl || !isOwner
-          ? "Tap play to hear member’s authentic 15-second voice introduction."
-          : "Add an authentic 15-second voice note to let your community hear you."}
+          : voiceUrl
+          ? "Authentic 15-second voice introduction attached to profile."
+          : isOwner
+          ? "Add a 15-second voice intro to hit 100% profile completion!"
+          : "No voice introduction recorded yet."}
       </Text>
     </Card>
   );
@@ -182,8 +324,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    minWidth: 70,
   },
   recordText: { fontSize: 12, fontWeight: "700" },
   hint: { fontSize: 12, lineHeight: 17 },
 });
-

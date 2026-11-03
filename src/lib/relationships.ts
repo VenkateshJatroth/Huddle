@@ -559,3 +559,16 @@ export async function fetchRelationshipCounts(userId: string): Promise<Relations
     following: accepted.filter((c) => c.youFollow).length,
   };
 }
+
+export async function fetchRelationshipMembers(userId: string): Promise<{
+  followers: RelationshipProfileSummary[];
+  following: RelationshipProfileSummary[];
+}> {
+  const overview = await fetchRelationshipOverview(userId);
+  const accepted = overview.connections;
+
+  return {
+    followers: accepted.filter((c) => c.followsYou).map((c) => c.profile),
+    following: accepted.filter((c) => c.youFollow).map((c) => c.profile),
+  };
+}

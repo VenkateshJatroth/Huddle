@@ -154,9 +154,9 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <SectionHeading title="Personal Account Details" />
           <Card style={styles.card}>
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: colors.secondary }]}>Email</Text>
-              <Text style={[styles.infoValue, { color: colors.text }]}>{user?.email ?? "Not available"}</Text>
+            <View style={styles.accountHeaderBlock}>
+              <Text style={[styles.signedInLabel, { color: colors.secondary }]}>Signed in as</Text>
+              <Text style={[styles.signedInEmail, { color: colors.text }]}>{user?.email ?? "Email unavailable"}</Text>
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <View style={styles.infoRow}>
@@ -364,6 +364,9 @@ const styles = StyleSheet.create({
   headerRightPlaceholder: { width: 50 },
   scrollContent: { padding: 16, gap: 20 },
   section: { gap: 8 },
+  accountHeaderBlock: { gap: 4, paddingVertical: 2 },
+  signedInLabel: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
+  signedInEmail: { fontSize: 16, fontWeight: "800" },
   card: { padding: 16, gap: 12 },
   infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   infoLabel: { fontSize: 14, fontWeight: "500" },
