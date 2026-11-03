@@ -7,11 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "huddle",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#000000"
-    },
     "ios": {
       "icon": "./assets/icon.png",
       "supportsTablet": false,
@@ -78,7 +73,16 @@
       ],
       "expo-web-browser",
       "expo-sqlite",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraProguardRules": "-keep class org.webrtc.** { *; }\n-dontwarn org.webrtc.**\n-keep class com.oney.WebRTCModule.** { *; }\n-dontwarn com.oney.WebRTCModule.**"
+          }
+        }
+      ],
+      "expo-asset"
     ],
     "runtimeVersion": {
       "policy": "appVersion"
