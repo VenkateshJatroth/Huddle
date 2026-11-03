@@ -27,7 +27,6 @@ import {
 import { interestOptions } from "../data/mockData";
 import type { DiscoverProfile } from "../lib/gormati-profiles";
 import {
-  demoDiscoverProfiles,
   fetchDiscoverProfiles,
 } from "../lib/gormati-profiles";
 import type { DirectoryProfile } from "../lib/relationships";
@@ -90,21 +89,16 @@ export default function DiscoverScreen() {
     try {
       if (user) {
         const live = await fetchDiscoverProfiles(user.id);
-        if (live && live.length > 0) {
-          setDiscoverProfiles(live);
-          setIsFallbackData(false);
-        } else {
-          setDiscoverProfiles([]);
-          setIsFallbackData(false);
-        }
+        setDiscoverProfiles(live || []);
+        setIsFallbackData(false);
       } else {
-        setDiscoverProfiles(demoDiscoverProfiles);
-        setIsFallbackData(true);
+        setDiscoverProfiles([]);
+        setIsFallbackData(false);
       }
     } catch {
       setIsOffline(true);
-      setDiscoverProfiles(demoDiscoverProfiles);
-      setIsFallbackData(true);
+      setDiscoverProfiles([]);
+      setIsFallbackData(false);
     } finally {
       setIsLoadingDiscover(false);
     }

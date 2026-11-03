@@ -42,7 +42,6 @@ import {
   subscribeToUnreadCount,
 } from "../../lib/notifications";
 import {
-  demoDiscoverProfiles,
   fetchDiscoverProfiles,
   fetchFullProfile,
   type DiscoverProfile,
@@ -170,7 +169,7 @@ export default function HomeScreen() {
   const loadSpotlight = useCallback(async () => {
     try {
       const [live, rels] = await Promise.all([
-        user ? fetchDiscoverProfiles(user.id, 8) : Promise.resolve(demoDiscoverProfiles),
+        user ? fetchDiscoverProfiles(user.id, 8) : Promise.resolve([]),
         fetchFollowedIds(),
       ]);
       const filtered = (live || []).filter((p) => !rels.has(p.id));
@@ -185,7 +184,7 @@ export default function HomeScreen() {
     async function init() {
       try {
         const [live, rels] = await Promise.all([
-          user ? fetchDiscoverProfiles(user.id, 8) : Promise.resolve(demoDiscoverProfiles),
+          user ? fetchDiscoverProfiles(user.id, 8) : Promise.resolve([]),
           fetchFollowedIds(),
         ]);
         if (!isCurrent) return;
@@ -223,12 +222,24 @@ export default function HomeScreen() {
   }, [loadSpotlight, feedFilter, user, selectedChannel]);
 
   const handleLikeMember = async (profile: DiscoverProfile) => {
+    // Optimistic UI update
     setLikedProfileIds((prev) => ({ ...prev, [profile.id]: true }));
     setFollowedIds((prev) => new Set([...prev, profile.id]));
     try {
       await followProfile(profile.id, user?.id);
     } catch {
-      // Graceful fallback for demo profiles
+      // Rollback on failure
+      setLikedProfileIds((prev) => {
+        const next = { ...prev };
+        delete next[profile.id];
+        return next;
+      });
+      setFollowedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(profile.id);
+        return next;
+      });
+      Alert.alert("Unable to Connect", "Could not connect with member. Please check your internet connection.");
     }
   };
 

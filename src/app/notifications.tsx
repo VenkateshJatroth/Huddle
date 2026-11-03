@@ -127,6 +127,11 @@ export default function NotificationsScreen() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n)),
       );
+      const remainingUnread = Math.max(
+        0,
+        notifications.filter((n) => !n.is_read && n.id !== notif.id).length,
+      );
+      notifyUnreadCountChange(remainingUnread);
       void markNotificationAsRead(notif.id);
     }
     if (notif.type === "message" && notif.reference_id) {

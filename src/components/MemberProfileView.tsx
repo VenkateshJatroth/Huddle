@@ -175,10 +175,13 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
   const handleLike = async () => {
     if (!profile || isLiking || isLiked) return;
     setIsLiking(true);
+    setIsLiked(true);
     try {
       await recordLike(profile.id);
       await followProfile(profile.id, user?.id);
-      setIsLiked(true);
+    } catch {
+      setIsLiked(false);
+      Alert.alert("Unable to Connect", "Could not connect with member. Please check your internet connection.");
     } finally {
       setIsLiking(false);
     }

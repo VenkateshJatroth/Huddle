@@ -55,81 +55,6 @@ export type DiscoverProfile = {
   prompts?: { question: string; answer: string }[] | null;
 };
 
-export const demoDiscoverProfiles: DiscoverProfile[] = [
-  {
-    id: "account-sana",
-    display_name: "Sana Iqbal",
-    username: "sana.in.pune",
-    avatar_url: null,
-    age: 25,
-    location: "Pune, Maharashtra",
-    dating_intention: "Long-term",
-    bio: "Finding the best chai spots and taking photos along the way. Passionate about architecture and storytelling.",
-    interests: ["Photography", "Food", "Books"],
-    is_verified: true,
-    prompts: [
-      {
-        question: "My favorite conversation starter is",
-        answer: "Which city in India holds your favorite memories and why?",
-      },
-    ],
-  },
-  {
-    id: "account-dev",
-    display_name: "Dev Menon",
-    username: "devbuilds",
-    avatar_url: null,
-    age: 28,
-    location: "Kochi, Kerala",
-    dating_intention: "Friends",
-    bio: "Weekend rides, open source, and long conversations by the sea. Always learning something new.",
-    interests: ["Technology", "Cycling", "Music"],
-    is_verified: true,
-    prompts: [
-      {
-        question: "A typical Sunday for me looks like",
-        answer: "A 40km sunrise bike ride followed by filter coffee and good books.",
-      },
-    ],
-  },
-  {
-    id: "account-priya",
-    display_name: "Priya Kulkarni",
-    username: "priyareads",
-    avatar_url: null,
-    age: 26,
-    location: "Mumbai, Maharashtra",
-    dating_intention: "Long-term",
-    bio: "Hosting a tiny book club that keeps getting a little bigger. Art lover, museum walker.",
-    interests: ["Books", "Arts", "Wellness"],
-    is_verified: false,
-    prompts: [
-      {
-        question: "The quickest way to my heart is",
-        answer: "Recommending an independent bookstore or an obscure indie record.",
-      },
-    ],
-  },
-  {
-    id: "account-karthik",
-    display_name: "Karthik Reddy",
-    username: "karthik.cooks",
-    avatar_url: null,
-    age: 27,
-    location: "Hyderabad, Telangana",
-    dating_intention: "Casual",
-    bio: "Learning regional recipes from every place I visit. Tech by day, amateur chef by night.",
-    interests: ["Food", "Travel", "Cooking"],
-    is_verified: true,
-    prompts: [
-      {
-        question: "I'm looking for someone who",
-        answer: "Appreciates homemade biryani and spontaneous road trips.",
-      },
-    ],
-  },
-];
-
 // ---------------------------------------------------------------------------
 // Discover feed
 // ---------------------------------------------------------------------------
@@ -163,22 +88,7 @@ export async function fetchDiscoverProfiles(
     // Non-blocking query guard
   }
 
-  // 2. Also check local demo relationship store so followed demo users are excluded
-  try {
-    const raw = globalThis.localStorage?.getItem("gormati_demo_relationships_v2");
-    if (raw) {
-      const demoStore = JSON.parse(raw);
-      Object.entries(demoStore).forEach(([id, state]: [string, any]) => {
-        if (state.youFollow || state.status === "accepted" || state.status === "outgoing_pending") {
-          excludedIds.add(id);
-        }
-      });
-    }
-  } catch {
-    // Local storage guard
-  }
-
-  // 3. Query live profiles from Supabase excluding current user
+  // 2. Query live profiles from Supabase excluding current user
   try {
     const { data, error } = await supabase
       .from("profiles")
@@ -214,11 +124,10 @@ export async function fetchDiscoverProfiles(
       }
     }
   } catch {
-    // Fall back to demo profiles below
+    // Network / query failure returns empty array
   }
 
-  // 4. Fallback to demo profiles, filtering out any already followed/connected
-  return demoDiscoverProfiles.filter((p) => !excludedIds.has(p.id));
+  return [];
 }
 
 // ---------------------------------------------------------------------------
@@ -393,31 +302,7 @@ export async function fetchMemberProfile(memberId: string): Promise<GormatiProfi
       return data;
     }
   } catch {
-    // Check fallback
-  }
-
-  // Fallback to demo profile matching ID
-  const demo = demoDiscoverProfiles.find((p) => p.id === memberId);
-  if (demo) {
-    return {
-      id: demo.id,
-      display_name: demo.display_name,
-      username: demo.username,
-      bio: demo.bio,
-      avatar_url: demo.avatar_url,
-      is_private: false,
-      is_verified: demo.is_verified,
-      full_name: demo.display_name,
-      age: demo.age,
-      location: demo.location,
-      dating_intention: demo.dating_intention,
-      interests: demo.interests,
-      prompts: demo.prompts ?? [],
-      gallery_urls: demo.avatar_url ? [demo.avatar_url] : [],
-      push_token: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    // Return null on failure
   }
 
   return null;

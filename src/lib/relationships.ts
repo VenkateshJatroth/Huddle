@@ -62,78 +62,6 @@ export class RelationshipTargetUnavailableError extends Error {
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-// ---------------------------------------------------------------------------
-// Demo Friends State
-// ---------------------------------------------------------------------------
-export const DEMO_FRIENDS: Record<string, RelationshipProfileSummary> = {
-  "account-sana": {
-    id: "account-sana",
-    username: "sana.in.pune",
-    display_name: "Sana Iqbal",
-    is_private: false,
-    bio: "Finding the best chai spots and taking photos along the way. Passionate about architecture and storytelling.",
-    avatar_url: null,
-  },
-  "account-dev": {
-    id: "account-dev",
-    username: "devbuilds",
-    display_name: "Dev Menon",
-    is_private: false,
-    bio: "Weekend rides, open source, and long conversations by the sea.",
-    avatar_url: null,
-  },
-  "account-priya": {
-    id: "account-priya",
-    username: "priyareads",
-    display_name: "Priya Kulkarni",
-    is_private: false,
-    bio: "Hosting a tiny book club that keeps getting a little bigger. Art lover, museum walker.",
-    avatar_url: null,
-  },
-  "account-karthik": {
-    id: "account-karthik",
-    username: "karthik.cooks",
-    display_name: "Karthik Reddy",
-    is_private: false,
-    bio: "Learning regional recipes from every place I visit. Tech by day, amateur chef by night.",
-    avatar_url: null,
-  },
-};
-
-type DemoFriendState = {
-  status: "incoming_pending" | "outgoing_pending" | "accepted" | "none";
-  youFollow: boolean;
-  followsYou: boolean;
-};
-
-const DEMO_STORAGE_KEY = "gormati_demo_relationships_v2";
-
-function getDemoRelationshipStore(): Record<string, DemoFriendState> {
-  try {
-    const raw = globalThis.localStorage?.getItem(DEMO_STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // Fallback to default initial state
-  }
-
-  // Default initial demo state: Sana has sent a request, Dev and Priya are connected matches
-  const initial: Record<string, DemoFriendState> = {
-    "account-sana": { status: "incoming_pending", youFollow: false, followsYou: true },
-    "account-dev": { status: "accepted", youFollow: true, followsYou: true },
-    "account-priya": { status: "accepted", youFollow: true, followsYou: true },
-  };
-  saveDemoRelationshipStore(initial);
-  return initial;
-}
-
-function saveDemoRelationshipStore(store: Record<string, DemoFriendState>): void {
-  try {
-    globalThis.localStorage?.setItem(DEMO_STORAGE_KEY, JSON.stringify(store));
-  } catch {
-    // Storage write guard
-  }
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -171,26 +99,7 @@ export async function searchDirectoryProfiles(query: string, limit = 20): Promis
 
   const results: DirectoryProfile[] = [];
 
-  // 1. Search demo friends
-  const demoStore = getDemoRelationshipStore();
-  Object.values(DEMO_FRIENDS).forEach((df) => {
-    if (
-      df.username.toLowerCase().includes(normalizedQuery) ||
-      df.display_name.toLowerCase().includes(normalizedQuery)
-    ) {
-      const state = demoStore[df.id] || { status: "none", youFollow: false, followsYou: false };
-      results.push({
-        id: df.id,
-        username: df.username,
-        display_name: df.display_name,
-        is_private: df.is_private,
-        relationship_status: state.status === "accepted" ? "accepted" : state.status === "outgoing_pending" ? "pending" : null,
-        follows_you: state.followsYou,
-      });
-    }
-  });
-
-  // 2. Search live Supabase profiles
+  // Search live Supabase profiles
   try {
     const { data } = await supabase
       .from("profiles")
@@ -200,20 +109,18 @@ export async function searchDirectoryProfiles(query: string, limit = 20): Promis
 
     if (data && Array.isArray(data)) {
       data.forEach((p) => {
-        if (!results.some((r) => r.id === p.id)) {
-          results.push({
-            id: p.id,
-            username: p.username,
-            display_name: p.display_name,
-            is_private: p.is_private ?? false,
-            relationship_status: null,
-            follows_you: false,
-          });
-        }
+        results.push({
+          id: p.id,
+          username: p.username,
+          display_name: p.display_name,
+          is_private: p.is_private ?? false,
+          relationship_status: null,
+          follows_you: false,
+        });
       });
     }
   } catch {
-    // Supabase search fallback
+    // Return empty on failure
   }
 
   return results.slice(0, limit);
@@ -236,21 +143,6 @@ async function getCurrentUserName(userId: string): Promise<string> {
 // Follow / Connect
 // ---------------------------------------------------------------------------
 export async function followProfile(targetId: string, currentUserId?: string): Promise<RelationshipStatus> {
-  // Check if target is a demo account
-  if (DEMO_FRIENDS[targetId]) {
-    const store = getDemoRelationshipStore();
-    const current = store[targetId] || { status: "none", youFollow: false, followsYou: false };
-    const newStatus: RelationshipStatus = DEMO_FRIENDS[targetId].is_private ? "pending" : "accepted";
-    store[targetId] = {
-      status: newStatus === "accepted" ? "accepted" : "outgoing_pending",
-      youFollow: true,
-      followsYou: current.followsYou,
-    };
-    saveDemoRelationshipStore(store);
-    return newStatus;
-  }
-
-  // Real database member
   if (!uuidPattern.test(targetId)) throw new RelationshipTargetUnavailableError();
 
   try {
@@ -300,18 +192,6 @@ export async function followProfile(targetId: string, currentUserId?: string): P
 // Approve Follow Request
 // ---------------------------------------------------------------------------
 export async function approveFollowRequest(requesterId: string, currentUserId?: string): Promise<boolean> {
-  // Demo friend approval (e.g. Sana)
-  if (DEMO_FRIENDS[requesterId]) {
-    const store = getDemoRelationshipStore();
-    store[requesterId] = {
-      status: "accepted",
-      youFollow: true,
-      followsYou: true,
-    };
-    saveDemoRelationshipStore(store);
-    return true;
-  }
-
   if (!uuidPattern.test(requesterId)) return false;
 
   try {
@@ -361,18 +241,6 @@ export async function approveFollowRequest(requesterId: string, currentUserId?: 
 // Reject Follow Request
 // ---------------------------------------------------------------------------
 export async function rejectFollowRequest(requesterId: string, currentUserId?: string): Promise<boolean> {
-  // Demo friend rejection
-  if (DEMO_FRIENDS[requesterId]) {
-    const store = getDemoRelationshipStore();
-    store[requesterId] = {
-      status: "none",
-      youFollow: false,
-      followsYou: false,
-    };
-    saveDemoRelationshipStore(store);
-    return true;
-  }
-
   if (!uuidPattern.test(requesterId)) return false;
 
   try {
@@ -393,17 +261,6 @@ export async function rejectFollowRequest(requesterId: string, currentUserId?: s
 // Remove Relationship (Unfollow)
 // ---------------------------------------------------------------------------
 export async function removeFollowRelationship(targetId: string, currentUserId?: string): Promise<boolean> {
-  if (DEMO_FRIENDS[targetId]) {
-    const store = getDemoRelationshipStore();
-    store[targetId] = {
-      status: "none",
-      youFollow: false,
-      followsYou: false,
-    };
-    saveDemoRelationshipStore(store);
-    return true;
-  }
-
   if (!uuidPattern.test(targetId)) return false;
 
   try {
@@ -430,44 +287,7 @@ export async function fetchRelationshipOverview(userId: string): Promise<Relatio
   const outgoing: RelationshipEntry[] = [];
   const connectionMap = new Map<string, AcceptedConnection>();
 
-  // 1. Process Demo Friends
-  const demoStore = getDemoRelationshipStore();
-  Object.entries(demoStore).forEach(([id, state]) => {
-    const profile = DEMO_FRIENDS[id];
-    if (!profile) return;
-
-    if (state.status === "incoming_pending") {
-      incoming.push({
-        relationship: {
-          requester_id: id,
-          target_id: userId,
-          status: "pending",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        profile,
-      });
-    } else if (state.status === "outgoing_pending") {
-      outgoing.push({
-        relationship: {
-          requester_id: userId,
-          target_id: id,
-          status: "pending",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        profile,
-      });
-    } else if (state.status === "accepted") {
-      connectionMap.set(id, {
-        profile,
-        youFollow: state.youFollow,
-        followsYou: state.followsYou,
-      });
-    }
-  });
-
-  // 2. Fetch real Supabase relationships using live columns: follower_id & following_id
+  // Fetch real Supabase relationships using live columns: follower_id & following_id
   try {
     const { data: rows } = await (supabase as any)
       .from("follow_relationships")

@@ -57,3 +57,4 @@ export async function compressImage(
     return { uri };
   }
 }
+

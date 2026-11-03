@@ -108,21 +108,8 @@ export function DailyHotTakeCard() {
           setComments(commentsData as HotTakeComment[]);
         }
       } catch {
-        // Fallback demo hot take if offline
         if (isCurrent) {
-          setHotTake({
-            id: "hot-take-demo",
-            question: "Arranged Marriage vs Love Marriage: Which lasts longer in modern times?",
-            option_a: "Arranged with deep family compatibility",
-            option_b: "Love built on personal choice & romance",
-            active_date: new Date().toISOString().split("T")[0],
-            category: "Relationships",
-            votes_a: 42,
-            votes_b: 68,
-            created_at: new Date().toISOString(),
-          });
-          setVotesA(42);
-          setVotesB(68);
+          setHotTake(null);
         }
       } finally {
         if (isCurrent) setIsLoading(false);
@@ -142,25 +129,34 @@ export function DailyHotTakeCard() {
       return;
     }
 
-    setIsVoting(true);
-    try {
-      setUserVote(choice);
-      if (choice === "A") {
-        setVotesA((v) => v + 1);
-      } else {
-        setVotesB((v) => v + 1);
-      }
+    const previousVote = userVote;
+    const previousA = votesA;
+    const previousB = votesB;
 
+    setIsVoting(true);
+    // Optimistic UI state
+    setUserVote(choice);
+    if (choice === "A") {
+      setVotesA((v) => v + 1);
+    } else {
+      setVotesB((v) => v + 1);
+    }
+
+    try {
       await (supabase as any).from("hot_take_responses").upsert({
         hot_take_id: hotTake.id,
         user_id: user.id,
         choice,
       });
 
-      const updateCol = choice === "A" ? { votes_a: votesA + 1 } : { votes_b: votesB + 1 };
+      const updateCol = choice === "A" ? { votes_a: previousA + 1 } : { votes_b: previousB + 1 };
       await (supabase as any).from("daily_hot_takes").update(updateCol).eq("id", hotTake.id);
     } catch {
-      // Retain optimistic vote in UI
+      // Rollback on failure
+      setUserVote(previousVote);
+      setVotesA(previousA);
+      setVotesB(previousB);
+      Alert.alert("Vote Failed", "Could not record your vote. Please check your network connection.");
     } finally {
       setIsVoting(false);
     }

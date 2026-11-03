@@ -24,39 +24,6 @@ export type InAppNotification = {
   time?: string;
 };
 
-const demoNotifications: InAppNotification[] = [
-  {
-    id: "notif-1",
-    user_id: "me",
-    actor_name: "Sana Iqbal",
-    type: "message",
-    content: "Sent you a message: 'Hey there! Loved your take on exploring old neighborhoods...'",
-    is_read: false,
-    created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    time: "15m ago",
-  },
-  {
-    id: "notif-2",
-    user_id: "me",
-    actor_name: "Dev Menon",
-    type: "follow",
-    content: "Connected with you on Huddle.",
-    is_read: false,
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    time: "2h ago",
-  },
-  {
-    id: "notif-3",
-    user_id: "me",
-    actor_name: "Priya Kulkarni",
-    type: "like",
-    content: "Liked your community post.",
-    is_read: true,
-    created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-    time: "1d ago",
-  },
-];
-
 function formatTimeAgo(dateString: string): string {
   try {
     const diffMs = Date.now() - new Date(dateString).getTime();
@@ -93,19 +60,16 @@ export function notifyUnreadCountChange(count: number): void {
 }
 
 export async function fetchNotifications(userId: string): Promise<InAppNotification[]> {
+  if (!userId) return [];
   try {
     const { data, error } = await (supabase as any)
       .from("notifications")
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
-      .limit(30);
+      .limit(50);
 
     if (error || !data) {
-      return [];
-    }
-
-    if (data.length === 0) {
       return [];
     }
 
@@ -120,6 +84,7 @@ export async function fetchNotifications(userId: string): Promise<InAppNotificat
 }
 
 export async function fetchUnreadNotificationCount(userId: string): Promise<number> {
+  if (!userId) return 0;
   try {
     const { count, error } = await (supabase as any)
       .from("notifications")
@@ -143,30 +108,30 @@ export async function fetchUnreadNotificationCount(userId: string): Promise<numb
 }
 
 export async function markAllNotificationsAsRead(userId: string): Promise<void> {
-  demoNotifications.forEach((n) => { n.is_read = true; });
+  if (!userId) return;
+  // Instantly reset unread count badge
+  notifyUnreadCountChange(0);
 
   try {
     await (supabase as any)
       .from("notifications")
       .update({ is_read: true })
       .eq("user_id", userId);
-  } catch {
-    // Non-blocking
+  } catch (err) {
+    console.warn("markAllNotificationsAsRead db error:", err);
   }
-  notifyUnreadCountChange(0);
 }
 
 export async function markNotificationAsRead(notificationId: string): Promise<void> {
-  const demoItem = demoNotifications.find((n) => n.id === notificationId);
-  if (demoItem) demoItem.is_read = true;
+  if (!notificationId) return;
 
   try {
     await (supabase as any)
       .from("notifications")
       .update({ is_read: true })
       .eq("id", notificationId);
-  } catch {
-    // Non-blocking
+  } catch (err) {
+    console.warn("markNotificationAsRead db error:", err);
   }
 }
 

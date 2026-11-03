@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import { uploadProfileImage } from "./gormati-profiles";
 import { recordUserStreak } from "./streaks";
-import { samplePosts, type CommunityPost } from "../data/mockData";
+import type { CommunityPost } from "../data/mockData";
 
 export type PostAudience = "Everyone" | "Connections" | "Only me";
 
@@ -452,22 +452,11 @@ export async function fetchFeedPosts(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
 
-  // If real community posts exist, show them; otherwise fallback to sample posts
-  let merged: PublishedPost[];
-  if (customPosts.length > 0) {
-    merged = customPosts;
-  } else {
-    merged = samplePosts.map((sp) => ({
-      ...sp,
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      audience: "Everyone",
-      channel: (sp.id.includes("cycling") ? "Fitness" : "General") as CommunityChannel,
-    }));
-  }
+  let merged: PublishedPost[] = customPosts;
 
   if (filter === "Following") {
     merged = merged.filter(
-      (p) => p.id === "post-bengaluru-cycling" || p.audience === "Connections" || p.author_id === currentUserId,
+      (p) => p.audience === "Connections" || p.author_id === currentUserId,
     );
   }
 

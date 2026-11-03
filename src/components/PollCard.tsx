@@ -75,6 +75,7 @@ export function PollCard({
         setVotesCount(res.votesCount);
         setTotalVotes(res.totalVotes);
         setUserVotedIndex(res.userVotedIndex);
+        Alert.alert("Vote Failed", "Could not submit your vote. Please check your internet connection.");
       }
     } finally {
       setIsVoting(false);
