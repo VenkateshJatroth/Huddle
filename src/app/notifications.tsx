@@ -17,6 +17,8 @@ import { AppButton, Avatar, Card } from "../components/ui";
 import {
   fetchNotifications,
   markAllNotificationsAsRead,
+  markNotificationAsRead,
+  notifyUnreadCountChange,
   subscribeToNotifications,
   type InAppNotification,
 } from "../lib/notifications";
@@ -51,12 +53,23 @@ export default function NotificationsScreen() {
           setTimeout(() => resolve([]), 3500),
         );
         const data = await Promise.race([fetchNotifications(user.id), timeoutPromise]);
-        setNotifications(data || []);
+        const notifs = data || [];
+        setNotifications(notifs);
+
+        // Viewing notifications automatically clears unread count in DB and resets badge
+        const hasUnread = notifs.some((n) => !n.is_read);
+        if (hasUnread) {
+          void markAllNotificationsAsRead(user.id);
+        } else {
+          notifyUnreadCountChange(0);
+        }
       } else {
         setNotifications([]);
+        notifyUnreadCountChange(0);
       }
     } catch {
       setNotifications([]);
+      notifyUnreadCountChange(0);
     } finally {
       setIsLoading(false);
     }
@@ -89,6 +102,7 @@ export default function NotificationsScreen() {
     if (!user) return;
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     await markAllNotificationsAsRead(user.id);
+    notifyUnreadCountChange(0);
   };
 
   const handleFollowBack = async (notif: InAppNotification) => {
@@ -96,6 +110,7 @@ export default function NotificationsScreen() {
     setBusyFollowId(notif.actor_id);
     try {
       await followProfile(notif.actor_id, user.id);
+      void markNotificationAsRead(notif.id);
       setFollowedBackIds((prev) => ({ ...prev, [notif.actor_id!]: true }));
       setNotifications((prev) =>
         prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n)),
@@ -108,6 +123,12 @@ export default function NotificationsScreen() {
   };
 
   const handleNotificationPress = (notif: InAppNotification) => {
+    if (!notif.is_read) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n)),
+      );
+      void markNotificationAsRead(notif.id);
+    }
     if (notif.type === "message" && notif.reference_id) {
       router.push(("/chat/" + notif.reference_id) as never);
     } else if (notif.type === "follow" && notif.actor_id) {

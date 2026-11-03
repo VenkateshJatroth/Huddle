@@ -72,6 +72,26 @@ function formatTimeAgo(dateString: string): string {
   }
 }
 
+type UnreadCountListener = (count: number) => void;
+const unreadListeners = new Set<UnreadCountListener>();
+
+export function subscribeToUnreadCount(listener: UnreadCountListener): () => void {
+  unreadListeners.add(listener);
+  return () => {
+    unreadListeners.delete(listener);
+  };
+}
+
+export function notifyUnreadCountChange(count: number): void {
+  unreadListeners.forEach((fn) => {
+    try {
+      fn(count);
+    } catch {
+      // Safe dispatch
+    }
+  });
+}
+
 export async function fetchNotifications(userId: string): Promise<InAppNotification[]> {
   try {
     const { data, error } = await (supabase as any)
@@ -105,10 +125,15 @@ export async function fetchUnreadNotificationCount(userId: string): Promise<numb
       .from("notifications")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
-      .eq("is_read", false);
+      .or("is_read.eq.false,is_read.is.null");
 
     if (error || count == null) {
-      return 0;
+      const fallback = await (supabase as any)
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("is_read", false);
+      return fallback.count || 0;
     }
 
     return count;
@@ -124,8 +149,22 @@ export async function markAllNotificationsAsRead(userId: string): Promise<void> 
     await (supabase as any)
       .from("notifications")
       .update({ is_read: true })
-      .eq("user_id", userId)
-      .eq("is_read", false);
+      .eq("user_id", userId);
+  } catch {
+    // Non-blocking
+  }
+  notifyUnreadCountChange(0);
+}
+
+export async function markNotificationAsRead(notificationId: string): Promise<void> {
+  const demoItem = demoNotifications.find((n) => n.id === notificationId);
+  if (demoItem) demoItem.is_read = true;
+
+  try {
+    await (supabase as any)
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", notificationId);
   } catch {
     // Non-blocking
   }

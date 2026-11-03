@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -39,6 +39,7 @@ import {
 import {
   fetchUnreadNotificationCount,
   subscribeToNotifications,
+  subscribeToUnreadCount,
 } from "../../lib/notifications";
 import {
   demoDiscoverProfiles,
@@ -105,12 +106,25 @@ export default function HomeScreen() {
           setUnreadCount((c) => c + 1);
         })
       : () => {};
+    const unsubUnread = subscribeToUnreadCount((count) => {
+      setUnreadCount(count);
+    });
 
     return () => {
       unsubBlocked();
       unsubNotifs();
+      unsubUnread();
     };
   }, [user]);
+
+  // Recalculate unread notifications whenever Home tab gains focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) {
+        void fetchUnreadNotificationCount(user.id).then(setUnreadCount);
+      }
+    }, [user]),
+  );
 
   useEffect(() => {
     let isCurrent = true;
