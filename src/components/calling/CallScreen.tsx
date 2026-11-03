@@ -30,6 +30,7 @@ import {
   MediaStream,
   PEER_CONNECTION_CONFIG,
   resetAudioSession,
+  restartPeerIce,
   RTCIceCandidate,
   RTCPeerConnection,
   RTCSessionDescription,
@@ -79,6 +80,17 @@ export function CallScreen({
   const [localStream, setLocalStream] = useState<MediaStreamType | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStreamType | null>(null);
   const [isPeerConnected, setIsPeerConnected] = useState(false);
+
+  const callStatusRef = useRef(callStatus);
+  const isPeerConnectedRef = useRef(isPeerConnected);
+
+  useEffect(() => {
+    callStatusRef.current = callStatus;
+  }, [callStatus]);
+
+  useEffect(() => {
+    isPeerConnectedRef.current = isPeerConnected;
+  }, [isPeerConnected]);
 
   const pcRef = useRef<any>(null);
   const localStreamRef = useRef<MediaStreamType | null>(null);
@@ -301,8 +313,83 @@ export function CallScreen({
       }
     });
 
+    // 5b. Monitor ICE connection state & handle timeouts / automatic ICE restart
+    let iceRestartAttempted = false;
+    let iceDisconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleIceConnectionStateChange = () => {
+      if (!isMounted) return;
+      const iceState = pc.iceConnectionState;
+
+      if (iceState === "connected" || iceState === "completed") {
+        if (iceDisconnectTimer) {
+          clearTimeout(iceDisconnectTimer);
+          iceDisconnectTimer = null;
+        }
+        setCallStatus("connected");
+        setIsPeerConnected(true);
+      } else if (iceState === "disconnected") {
+        setIsPeerConnected(false);
+        // Wait 6 seconds for transient mobile network recovery before triggering ICE restart
+        if (!iceDisconnectTimer) {
+          iceDisconnectTimer = setTimeout(() => {
+            if (!isMounted) return;
+            const currentIce = pc.iceConnectionState;
+            if (currentIce === "disconnected" || currentIce === "failed") {
+              if (!iceRestartAttempted) {
+                iceRestartAttempted = true;
+                restartPeerIce(pc);
+                if (!isIncoming) {
+                  void initiateOffer({ iceRestart: true });
+                }
+              } else {
+                Alert.alert(
+                  "Call Disconnected",
+                  "The connection was lost. Please check your network and try again.",
+                  [{ text: "OK", onPress: () => handleEndCall() }],
+                );
+              }
+            }
+          }, 6000);
+        }
+      } else if (iceState === "failed") {
+        setIsPeerConnected(false);
+        if (!iceRestartAttempted) {
+          iceRestartAttempted = true;
+          restartPeerIce(pc);
+          if (!isIncoming) {
+            void initiateOffer({ iceRestart: true });
+          }
+        } else {
+          Alert.alert(
+            "Connection Failed",
+            "Could not establish a direct or relayed peer connection. Please verify your internet connection.",
+            [{ text: "OK", onPress: () => handleEndCall() }],
+          );
+        }
+      }
+    };
+
+    pc.oniceconnectionstatechange = handleIceConnectionStateChange;
+    pc.addEventListener("iceconnectionstatechange", handleIceConnectionStateChange);
+
     // 6. Register Realtime Signaling Event Listeners
     let callerReadyInterval: ReturnType<typeof setInterval> | null = null;
+    let ringingTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Caller connection timeout (45s): notify caller if callee never answers
+    if (!isIncoming) {
+      ringingTimeoutTimer = setTimeout(() => {
+        if (!isMounted) return;
+        if (callStatusRef.current === "ringing" && !isPeerConnectedRef.current) {
+          Alert.alert(
+            "No Answer",
+            "The recipient did not answer or the connection timed out. Please try again later.",
+            [{ text: "OK", onPress: () => handleEndCall() }],
+          );
+        }
+      }, 45000);
+    }
 
     // Helper: guarantees local media stream is acquired, audio session is configured,
     // and all local audio/video tracks are bound to RTCPeerConnection before SDP creation
@@ -324,14 +411,16 @@ export function CallScreen({
       return stream;
     };
 
-    const initiateOffer = async () => {
-      if (!isMounted || !pc || offerSentRef.current || isIncoming) return;
+    const initiateOffer = async (options?: { iceRestart?: boolean }) => {
+      if (!isMounted || !pc || isIncoming) return;
+      if (offerSentRef.current && !options?.iceRestart) return;
       offerSentRef.current = true;
       try {
         await ensureLocalTracks();
         const offer = await pc.createOffer({
           offerToReceiveAudio: true,
           offerToReceiveVideo: callType === "video",
+          iceRestart: Boolean(options?.iceRestart),
         });
         await pc.setLocalDescription(offer);
         await signalingChannel.send({
@@ -487,6 +576,12 @@ export function CallScreen({
       isMounted = false;
       if (callerReadyInterval) {
         clearInterval(callerReadyInterval);
+      }
+      if (ringingTimeoutTimer) {
+        clearTimeout(ringingTimeoutTimer);
+      }
+      if (iceDisconnectTimer) {
+        clearTimeout(iceDisconnectTimer);
       }
       try {
         void resetAudioSession();

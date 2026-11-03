@@ -11,16 +11,89 @@ import type {
   RTCVideoViewProps,
 } from "react-native-webrtc";
 
-// Reliable Google Public STUN Servers
+export type RTCIceServerConfig = {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+};
+
+// Multi-tier ICE Server Configuration (STUN + TURN Relays)
+export function getIceServers(): RTCIceServerConfig[] {
+  const customTurnUrl = process.env.EXPO_PUBLIC_TURN_URL;
+  const customTurnUsername = process.env.EXPO_PUBLIC_TURN_USERNAME;
+  const customTurnCredential = process.env.EXPO_PUBLIC_TURN_CREDENTIAL;
+
+  const servers: RTCIceServerConfig[] = [
+    // Tier 1: High-reliability Google & Cloudflare STUN servers
+    {
+      urls: [
+        "stun:stun.l.google.com:19302",
+        "stun:stun1.l.google.com:19302",
+        "stun:stun2.l.google.com:19302",
+        "stun:stun.cloudflare.com:3478",
+      ],
+    },
+  ];
+
+  // Tier 2: Custom TURN relay server if configured via environment variables
+  if (customTurnUrl && customTurnUsername && customTurnCredential) {
+    servers.push({
+      urls: customTurnUrl.split(",").map((u) => u.trim()),
+      username: customTurnUsername,
+      credential: customTurnCredential,
+    });
+  }
+
+  // Tier 3: High-availability OpenRelay / Metered TURN fallback configuration
+  // Supports UDP, TCP (Port 80 to bypass HTTP firewalls), and TURNS/TLS (Port 443 to bypass DPI firewalls)
+  servers.push(
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:80?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turns:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+  );
+
+  return servers;
+}
+
 export const rtcConfig = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" },
-  ],
+  iceServers: getIceServers(),
+  iceCandidatePoolSize: 10,
 };
 
 export const PEER_CONNECTION_CONFIG = rtcConfig;
+
+/**
+ * Triggers an ICE restart on an active RTCPeerConnection if supported.
+ */
+export function restartPeerIce(pc: any): boolean {
+  if (!pc) return false;
+  try {
+    if (typeof pc.restartIce === "function") {
+      pc.restartIce();
+      return true;
+    }
+  } catch (err) {
+    console.warn("Error calling pc.restartIce():", err);
+  }
+  return false;
+}
 
 /**
  * Pre-configures audio routing for WebRTC voice and video calls.
