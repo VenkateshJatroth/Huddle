@@ -24,9 +24,12 @@ import {
 } from "../../lib/calling";
 import { supabase } from "../../lib/supabase";
 import {
+  configureAudioSessionForCall,
   getLocalStream,
   isWebRTCSupported,
+  MediaStream,
   PEER_CONNECTION_CONFIG,
+  resetAudioSession,
   RTCIceCandidate,
   RTCPeerConnection,
   RTCSessionDescription,
@@ -35,7 +38,7 @@ import {
   switchCamera,
   toggleAudioTrack,
   toggleVideoTrack,
-  type MediaStream,
+  type WebRTCMediaStream as MediaStreamType,
 } from "../../services/webrtc";
 
 export type CallScreenProps = {
@@ -65,15 +68,21 @@ export function CallScreen({
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(callType === "video");
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const isSpeakerOnRef = useRef(true);
   const [isFrontCamera, setIsFrontCamera] = useState(true);
 
+  useEffect(() => {
+    isSpeakerOnRef.current = isSpeakerOn;
+  }, [isSpeakerOn]);
+
   // WebRTC Media Streams & Peer Connection
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStreamType | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStreamType | null>(null);
   const [isPeerConnected, setIsPeerConnected] = useState(false);
 
   const pcRef = useRef<any>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
+  const localStreamRef = useRef<MediaStreamType | null>(null);
+  const remoteStreamRef = useRef<MediaStreamType | null>(null);
   const candidateQueueRef = useRef<any[]>([]);
   const signalingChannelRef = useRef<any>(null);
   const isEndingRef = useRef(false);
@@ -88,6 +97,9 @@ export function CallScreen({
   const handleEndCall = useCallback(() => {
     if (isEndingRef.current) return;
     isEndingRef.current = true;
+
+    // Reset audio session mode to standard playback
+    void resetAudioSession();
 
     // 1. Broadcast call-ended on WebRTC signaling channel
     try {
@@ -107,6 +119,7 @@ export function CallScreen({
       stopMediaStream(localStreamRef.current);
       localStreamRef.current = null;
     }
+    remoteStreamRef.current = null;
 
     // 3. Close RTCPeerConnection
     if (pcRef.current) {
@@ -229,15 +242,35 @@ export function CallScreen({
       return;
     }
 
-    // 3. Listen for remote media tracks
-    pc.addEventListener("track", (event: any) => {
+    // 3. Listen for remote media tracks and bind to remote stream
+    const handleRemoteTrack = (event: any) => {
       if (!isMounted) return;
       if (event.streams && event.streams[0]) {
+        remoteStreamRef.current = event.streams[0];
         setRemoteStream(event.streams[0]);
-        setCallStatus("connected");
-        setIsPeerConnected(true);
+      } else if (event.track) {
+        if (!remoteStreamRef.current) {
+          try {
+            remoteStreamRef.current = new MediaStream() as MediaStreamType;
+          } catch {
+            // Guard
+          }
+        }
+        if (remoteStreamRef.current) {
+          try {
+            remoteStreamRef.current.addTrack(event.track);
+            setRemoteStream(remoteStreamRef.current);
+          } catch {
+            // Guard
+          }
+        }
       }
-    });
+      setCallStatus("connected");
+      setIsPeerConnected(true);
+    };
+
+    pc.ontrack = handleRemoteTrack;
+    pc.addEventListener("track", handleRemoteTrack);
 
     // 4. Listen for ICE candidates and broadcast to peer
     pc.addEventListener("icecandidate", (event: any) => {
@@ -271,10 +304,31 @@ export function CallScreen({
     // 6. Register Realtime Signaling Event Listeners
     let callerReadyInterval: ReturnType<typeof setInterval> | null = null;
 
+    // Helper: guarantees local media stream is acquired, audio session is configured,
+    // and all local audio/video tracks are bound to RTCPeerConnection before SDP creation
+    const ensureLocalTracks = async () => {
+      if (localStreamRef.current) return localStreamRef.current;
+      await configureAudioSessionForCall(isSpeakerOnRef.current);
+      const stream = await getLocalStream(callType === "video");
+      if (stream && isMounted) {
+        localStreamRef.current = stream;
+        setLocalStream(stream);
+        stream.getTracks().forEach((track) => {
+          try {
+            pc.addTrack(track, stream);
+          } catch (trackErr) {
+            console.warn("Failed to add track to peer connection:", trackErr);
+          }
+        });
+      }
+      return stream;
+    };
+
     const initiateOffer = async () => {
       if (!isMounted || !pc || offerSentRef.current || isIncoming) return;
       offerSentRef.current = true;
       try {
+        await ensureLocalTracks();
         const offer = await pc.createOffer({
           offerToReceiveAudio: true,
           offerToReceiveVideo: callType === "video",
@@ -322,6 +376,9 @@ export function CallScreen({
       .on("broadcast", { event: "sdp-offer" }, async ({ payload }) => {
         if (!isMounted || !pc || payload.senderId === currentUserId) return;
         try {
+          // Ensure local audio/video tracks are bound to pc before generating SDP answer
+          await ensureLocalTracks();
+
           await pc.setRemoteDescription(new RTCSessionDescription({ type: payload.type, sdp: payload.sdp }));
 
           // Flush any early arriving ICE candidates
@@ -391,22 +448,8 @@ export function CallScreen({
       if (status !== "SUBSCRIBED" || !isMounted) return;
 
       try {
-        // Acquire local microphone / camera
-        const stream = await getLocalStream(callType === "video");
-        if (!isMounted) {
-          if (stream) stopMediaStream(stream);
-          return;
-        }
-
-        if (stream) {
-          localStreamRef.current = stream;
-          setLocalStream(stream);
-
-          // Add local tracks to peer connection
-          stream.getTracks().forEach((track) => {
-            pc.addTrack(track, stream);
-          });
-        }
+        // Pre-configure audio session and bind local tracks immediately
+        await ensureLocalTracks();
 
         if (!isIncoming) {
           // Caller announces ready and polls until receiver responds with peer-ready
@@ -446,10 +489,12 @@ export function CallScreen({
         clearInterval(callerReadyInterval);
       }
       try {
+        void resetAudioSession();
         if (localStreamRef.current) {
           stopMediaStream(localStreamRef.current);
           localStreamRef.current = null;
         }
+        remoteStreamRef.current = null;
         if (pcRef.current) {
           pcRef.current.close();
           pcRef.current = null;
@@ -496,10 +541,13 @@ export function CallScreen({
   };
 
   const handleToggleSpeaker = () => {
-    setIsSpeakerOn((prev) => !prev);
+    const next = !isSpeakerOn;
+    setIsSpeakerOn(next);
+    void configureAudioSessionForCall(next);
   };
 
   const handleAcceptCall = () => {
+    void configureAudioSessionForCall(isSpeakerOn);
     if (callId) {
       void updateCallStatus(callId, "connected");
     }

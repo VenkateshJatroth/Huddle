@@ -1,5 +1,7 @@
 import React from "react";
 import { Platform, View, type ViewProps } from "react-native";
+import { Audio } from "expo-av";
+import { setAudioModeAsync as setExpoAudioModeAsync } from "expo-audio";
 import type {
   MediaStream as WebRTCMediaStream,
   MediaStreamTrack as WebRTCMediaStreamTrack,
@@ -9,14 +11,75 @@ import type {
   RTCVideoViewProps,
 } from "react-native-webrtc";
 
-// Free Google Public STUN Servers
-export const PEER_CONNECTION_CONFIG = {
+// Reliable Google Public STUN Servers
+export const rtcConfig = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
   ],
 };
+
+export const PEER_CONNECTION_CONFIG = rtcConfig;
+
+/**
+ * Pre-configures audio routing for WebRTC voice and video calls.
+ * Routes audio through loudspeaker by default and prevents mute in silent mode.
+ */
+export async function configureAudioSessionForCall(speakerOn: boolean = true): Promise<void> {
+  try {
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+      playThroughEarpieceAndroid: !speakerOn,
+      shouldDuckAndroid: true,
+    });
+  } catch (err) {
+    console.warn("expo-av setAudioModeAsync warning:", err);
+  }
+
+  try {
+    await setExpoAudioModeAsync({
+      allowsRecording: true,
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      shouldRouteThroughEarpiece: !speakerOn,
+      interruptionMode: "duckOthers",
+    });
+  } catch (err) {
+    console.warn("expo-audio setAudioModeAsync warning:", err);
+  }
+}
+
+/**
+ * Resets audio session back to normal media playback mode upon call completion.
+ */
+export async function resetAudioSession(): Promise<void> {
+  try {
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: false,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: false,
+      playThroughEarpieceAndroid: false,
+    });
+  } catch {
+    // Guard
+  }
+
+  try {
+    await setExpoAudioModeAsync({
+      allowsRecording: false,
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+      shouldRouteThroughEarpiece: false,
+      interruptionMode: "mixWithOthers",
+    });
+  } catch {
+    // Guard
+  }
+}
 
 // Safe native module loading with fallback for Web / older APKs
 let nativeWebRTC: typeof import("react-native-webrtc") | null = null;
@@ -42,11 +105,11 @@ function FallbackRTCView(props: ViewProps & { streamURL?: string; mirror?: boole
 export const RTCPeerConnection = nativeWebRTC?.RTCPeerConnection ?? (class {} as unknown as typeof WebRTCPeerConnection);
 export const RTCIceCandidate = nativeWebRTC?.RTCIceCandidate ?? (class {} as unknown as typeof WebRTCIceCandidate);
 export const RTCSessionDescription = nativeWebRTC?.RTCSessionDescription ?? (class {} as unknown as typeof WebRTCSessionDescription);
+export const MediaStream = nativeWebRTC?.MediaStream ?? (class {} as unknown as typeof WebRTCMediaStream);
 export const RTCView = (nativeWebRTC?.RTCView ?? FallbackRTCView) as React.ComponentType<RTCVideoViewProps>;
 export const mediaDevices = nativeWebRTC?.mediaDevices ?? null;
 
-export type MediaStream = WebRTCMediaStream;
-export type MediaStreamTrack = WebRTCMediaStreamTrack;
+export type { WebRTCMediaStream, WebRTCMediaStreamTrack };
 
 /**
  * Acquires local audio and optional video media stream.
