@@ -48,9 +48,15 @@ function RootNavigator() {
   // Listen for real-time incoming voice/video calls
   useEffect(() => {
     if (!user?.id) return;
-    const unsubscribe = subscribeToIncomingCalls(user.id, (call) => {
-      setIncomingCall(call);
-    });
+    const unsubscribe = subscribeToIncomingCalls(
+      user.id,
+      (call) => {
+        setIncomingCall(call);
+      },
+      (dismissedCallId) => {
+        setIncomingCall((curr) => (curr?.id === dismissedCallId ? null : curr));
+      },
+    );
     return () => {
       unsubscribe();
     };

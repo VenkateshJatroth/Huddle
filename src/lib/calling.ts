@@ -33,7 +33,7 @@ function getBroadcastChannel() {
 }
 
 /**
- * Initiates a new 1-on-1 voice or video call with Agora & Supabase Realtime signaling.
+ * Initiates a new 1-on-1 voice or video call with WebRTC & Supabase Realtime signaling.
  */
 export async function startCall(
   callerId: string,
@@ -75,28 +75,47 @@ export async function startCall(
     caller_avatar: callerAvatar,
   };
 
-  // Broadcast call invitation over Supabase Realtime channel for zero-latency ringing
+  const invitePayload = {
+    callId: session.id,
+    callerId,
+    callerName: callerName || "Huddle Member",
+    callerAvatar,
+    receiverId,
+    callType,
+    channelId,
+  };
+
+  // 1. Broadcast on global huddle-calls channel
   try {
     const broadcastChan = getBroadcastChannel();
-    await broadcastChan.send({
+    void broadcastChan.send({
       type: "broadcast",
       event: "call-invitation",
-      payload: {
-        callId: session.id,
-        callerId,
-        callerName: callerName || "Huddle Member",
-        callerAvatar,
-        receiverId,
-        callType,
-        channelId,
-        agoraToken: null,
-      },
+      payload: invitePayload,
     });
   } catch (err) {
-    console.warn("Failed to broadcast call-invitation:", err);
+    console.warn("Failed to broadcast call-invitation on huddle-calls:", err);
   }
 
-  // Send an in-app notification to the receiver
+  // 2. Broadcast directly to receiver's dedicated channel user_calls_<receiverId>
+  try {
+    const userChan = supabase.channel(`user_calls_${receiverId}`, {
+      config: { broadcast: { self: true } },
+    });
+    userChan.subscribe((subStatus) => {
+      if (subStatus === "SUBSCRIBED") {
+        void userChan.send({
+          type: "broadcast",
+          event: "call-invitation",
+          payload: invitePayload,
+        });
+      }
+    });
+  } catch (err) {
+    console.warn("Direct receiver channel send failed:", err);
+  }
+
+  // 3. Send in-app notification record to receiver
   try {
     await (supabase as any).from("notifications").insert({
       user_id: receiverId,
@@ -118,23 +137,43 @@ export async function startCall(
  * Updates call status (e.g. connected, ended, declined) and broadcasts to peers.
  */
 export async function updateCallStatus(callId: string, status: CallStatus): Promise<void> {
-  // 1. Instant Realtime broadcast
+  const payload = {
+    callId,
+    status,
+    timestamp: new Date().toISOString(),
+  };
+
+  // 1. Instant Realtime broadcast on huddle-calls
   try {
     const broadcastChan = getBroadcastChannel();
-    await broadcastChan.send({
+    void broadcastChan.send({
       type: "broadcast",
       event: "call-status",
-      payload: {
-        callId,
-        status,
-        timestamp: new Date().toISOString(),
-      },
+      payload,
     });
   } catch {
     // Non-blocking
   }
 
-  // 2. Persist in database
+  // 2. Realtime broadcast directly on call:<callId>
+  try {
+    const callChan = supabase.channel(`call:${callId}`, {
+      config: { broadcast: { self: false } },
+    });
+    callChan.subscribe((subStatus) => {
+      if (subStatus === "SUBSCRIBED") {
+        void callChan.send({
+          type: "broadcast",
+          event: "call-status",
+          payload,
+        });
+      }
+    });
+  } catch {
+    // Non-blocking
+  }
+
+  // 3. Persist in database
   try {
     const updatePayload: Record<string, any> = { status };
     if (status === "connected") {
@@ -199,6 +238,7 @@ export function subscribeToCall(
 export function subscribeToIncomingCalls(
   userId: string,
   onIncoming: (call: CallSession) => void,
+  onDismiss?: (callId: string) => void,
 ): () => void {
   const handledCalls = new Set<string>();
 
@@ -208,7 +248,31 @@ export function subscribeToIncomingCalls(
     onIncoming(call);
   };
 
-  // 1. Instant Realtime broadcast listener
+  // 1. Direct user broadcast channel user_calls_<userId>
+  const userChan = supabase
+    .channel(`user_calls_${userId}`, {
+      config: { broadcast: { self: true } },
+    })
+    .on("broadcast", { event: "call-invitation" }, ({ payload }) => {
+      if (payload && payload.receiverId === userId) {
+        notifyOnce({
+          id: payload.callId,
+          caller_id: payload.callerId,
+          caller_name: payload.callerName,
+          caller_avatar: payload.callerAvatar,
+          receiver_id: payload.receiverId,
+          call_type: payload.callType,
+          status: "ringing",
+          room_url: payload.channelId ? `https://meet.huddle.app/${payload.channelId}` : null,
+          agora_channel: payload.channelId,
+          agora_token: null,
+          created_at: new Date().toISOString(),
+        });
+      }
+    })
+    .subscribe();
+
+  // 2. Global huddle-calls channel listener
   const broadcastChan = getBroadcastChannel();
   broadcastChan.on("broadcast", { event: "call-invitation" }, ({ payload }) => {
     if (payload && payload.receiverId === userId) {
@@ -222,33 +286,44 @@ export function subscribeToIncomingCalls(
         status: "ringing",
         room_url: payload.channelId ? `https://meet.huddle.app/${payload.channelId}` : null,
         agora_channel: payload.channelId,
-        agora_token: payload.agoraToken,
+        agora_token: null,
         created_at: new Date().toISOString(),
       });
     }
   });
 
-  // 2. Durable Postgres table changes fallback
+  // Also listen for status changes so ringing banner dismisses if caller hangs up
+  broadcastChan.on("broadcast", { event: "call-status" }, ({ payload }) => {
+    if (payload && (payload.status === "ended" || payload.status === "declined")) {
+      onDismiss?.(payload.callId);
+    }
+  });
+
+  // 3. Durable Postgres table changes fallback
   const pgChannel = supabase
     .channel(`incoming_calls_${userId}`)
     .on(
       "postgres_changes",
       {
-        event: "INSERT",
+        event: "*",
         schema: "public",
         table: "call_sessions",
         filter: `receiver_id=eq.${userId}`,
       },
       (payload) => {
         const row = payload.new as CallSession;
-        if (row && row.status === "ringing") {
+        if (!row) return;
+        if (row.status === "ringing") {
           notifyOnce(row);
+        } else if (row.status === "ended" || row.status === "declined") {
+          onDismiss?.(row.id);
         }
       },
     )
     .subscribe();
 
   return () => {
+    void supabase.removeChannel(userChan);
     void supabase.removeChannel(pgChannel);
   };
 }

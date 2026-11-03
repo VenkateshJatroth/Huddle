@@ -77,6 +77,7 @@ export function CallScreen({
   const candidateQueueRef = useRef<any[]>([]);
   const signalingChannelRef = useRef<any>(null);
   const isEndingRef = useRef(false);
+  const offerSentRef = useRef(false);
 
   // Pulse animation for voice audio visualizer
   const [pulseAnim] = useState(() => new Animated.Value(1));
@@ -268,7 +269,56 @@ export function CallScreen({
     });
 
     // 6. Register Realtime Signaling Event Listeners
+    let callerReadyInterval: ReturnType<typeof setInterval> | null = null;
+
+    const initiateOffer = async () => {
+      if (!isMounted || !pc || offerSentRef.current || isIncoming) return;
+      offerSentRef.current = true;
+      try {
+        const offer = await pc.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: callType === "video",
+        });
+        await pc.setLocalDescription(offer);
+        await signalingChannel.send({
+          type: "broadcast",
+          event: "sdp-offer",
+          payload: {
+            sdp: offer.sdp,
+            type: offer.type,
+            senderId: currentUserId,
+          },
+        });
+      } catch (err) {
+        console.warn("Failed to create & broadcast sdp-offer:", err);
+        offerSentRef.current = false;
+      }
+    };
+
     signalingChannel
+      // Receiver notifies Caller that peer is ready to receive offer
+      .on("broadcast", { event: "peer-ready" }, async ({ payload }) => {
+        if (!isMounted || payload.senderId === currentUserId) return;
+        if (!isIncoming) {
+          if (callerReadyInterval) {
+            clearInterval(callerReadyInterval);
+            callerReadyInterval = null;
+          }
+          await initiateOffer();
+        }
+      })
+      // Caller notifies room that caller is online waiting for receiver
+      .on("broadcast", { event: "caller-ready" }, async ({ payload }) => {
+        if (!isMounted || payload.senderId === currentUserId) return;
+        if (isIncoming) {
+          // Immediately notify caller that receiver is ready
+          void signalingChannel.send({
+            type: "broadcast",
+            event: "peer-ready",
+            payload: { senderId: currentUserId },
+          });
+        }
+      })
       .on("broadcast", { event: "sdp-offer" }, async ({ payload }) => {
         if (!isMounted || !pc || payload.senderId === currentUserId) return;
         try {
@@ -358,21 +408,31 @@ export function CallScreen({
           });
         }
 
-        // Caller initiates the SDP offer
         if (!isIncoming) {
-          const offer = await pc.createOffer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: callType === "video",
-          });
-          await pc.setLocalDescription(offer);
-          await signalingChannel.send({
+          // Caller announces ready and polls until receiver responds with peer-ready
+          void signalingChannel.send({
             type: "broadcast",
-            event: "sdp-offer",
-            payload: {
-              sdp: offer.sdp,
-              type: offer.type,
-              senderId: currentUserId,
-            },
+            event: "caller-ready",
+            payload: { senderId: currentUserId },
+          });
+
+          callerReadyInterval = setInterval(() => {
+            if (offerSentRef.current || !isMounted) {
+              if (callerReadyInterval) clearInterval(callerReadyInterval);
+              return;
+            }
+            void signalingChannel.send({
+              type: "broadcast",
+              event: "caller-ready",
+              payload: { senderId: currentUserId },
+            });
+          }, 1200);
+        } else {
+          // Receiver announces peer-ready so caller can safely generate sdp-offer
+          void signalingChannel.send({
+            type: "broadcast",
+            event: "peer-ready",
+            payload: { senderId: currentUserId },
           });
         }
       } catch (err) {
@@ -382,6 +442,9 @@ export function CallScreen({
 
     return () => {
       isMounted = false;
+      if (callerReadyInterval) {
+        clearInterval(callerReadyInterval);
+      }
       try {
         if (localStreamRef.current) {
           stopMediaStream(localStreamRef.current);
@@ -441,6 +504,15 @@ export function CallScreen({
       void updateCallStatus(callId, "connected");
     }
     setCallStatus("connected");
+    try {
+      void signalingChannelRef.current?.send({
+        type: "broadcast",
+        event: "peer-ready",
+        payload: { senderId: currentUserId },
+      });
+    } catch {
+      // Safe guard
+    }
   };
 
   const formatTimer = (seconds: number) => {
