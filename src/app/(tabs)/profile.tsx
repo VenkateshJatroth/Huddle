@@ -27,6 +27,7 @@ import {
   uploadProfileImage,
 } from "../../lib/gormati-profiles";
 import type { GormatiProfile, GormatiProfileDraft } from "../../lib/gormati-profiles";
+import { compressImage } from "../../utils/imageCompression";
 
 import { useAuth } from "../../auth/AuthProvider";
 import { DemoAvatar } from "../../components/DemoAvatar";
@@ -360,7 +361,8 @@ function AuthenticatedProfileScreen({ user }: { user: User }) {
     setIsUploadingPhoto(true);
     setSaveError(null);
     try {
-      const publicUrl = await uploadProfileImage(user.id, result.assets[0].uri, "avatars");
+      const { uri: compressedUri } = await compressImage(result.assets[0].uri, { type: "avatar" });
+      const publicUrl = await uploadProfileImage(user.id, compressedUri, "avatars");
       const updated = await updateGormatiProfile(user.id, { avatar_url: publicUrl });
       setProfile(updated);
       setSaveNotice("Profile photo updated!");

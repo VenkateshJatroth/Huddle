@@ -15,6 +15,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import { compressImage } from "../../utils/imageCompression";
 import { useAuth } from "../../auth/AuthProvider";
 import { Icon } from "../../components/Icon";
 import { SafetyActionModal } from "../../components/SafetyActionModal";
@@ -163,7 +164,8 @@ export default function ChatScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setSelectedPhotoUri(result.assets[0].uri);
+      const { uri: compressed } = await compressImage(result.assets[0].uri, { type: "gallery" });
+      setSelectedPhotoUri(compressed);
     }
   };
 

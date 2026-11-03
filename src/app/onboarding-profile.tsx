@@ -27,6 +27,7 @@ import {
 } from "../lib/gormati-profiles";
 import { getProfileCompletion } from "../lib/profileCompletion";
 import { supabase } from "../lib/supabase";
+import { compressImage } from "../utils/imageCompression";
 import { useAppColors } from "../theme/colors";
 
 const DATING_INTENTIONS = ["Community", "Friends", "Long-term", "Casual"];
@@ -158,7 +159,8 @@ export default function OnboardingProfileScreen() {
 
     if (result.canceled || !result.assets[0]) return;
 
-    const uri = result.assets[0].uri;
+    const rawUri = result.assets[0].uri;
+    const { uri } = await compressImage(rawUri, { type: "avatar" });
     setLocalAvatarUri(uri);
     setIsUploadingPhoto(true);
     setErrorMessage(null);

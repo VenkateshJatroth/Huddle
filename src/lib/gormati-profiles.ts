@@ -9,6 +9,7 @@
 
 import type { Database } from "./database.types";
 import { supabase } from "./supabase";
+import { compressImage } from "../utils/imageCompression";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -238,6 +239,8 @@ export async function recordLike(toId: string): Promise<void> {
 
 /**
  * Uploads a local file URI to Supabase Storage and returns the public URL.
+ * Automatically resizes and compresses image on-device (800px for avatars, 1200px for gallery)
+ * to 0.75 JPEG quality before upload.
  *
  * @param userId   - The authenticated user's ID (used as a path namespace).
  * @param localUri - Local file URI from expo-image-picker.
@@ -248,11 +251,13 @@ export async function uploadProfileImage(
   localUri: string,
   bucket: "avatars" | "gallery",
 ): Promise<string> {
-  const extension = localUri.split(".").pop()?.toLowerCase() ?? "jpg";
-  const mimeType = extension === "png" ? "image/png" : "image/jpeg";
-  const fileName = `${userId}/${Date.now()}.${extension}`;
+  const compressionType = bucket === "avatars" ? "avatar" : "feed";
+  const { uri: compressedUri } = await compressImage(localUri, { type: compressionType });
 
-  const response = await fetch(localUri);
+  const fileName = `${userId}/${Date.now()}.jpg`;
+  const mimeType = "image/jpeg";
+
+  const response = await fetch(compressedUri);
   const arrayBuffer = await response.arrayBuffer();
 
   const { error } = await supabase.storage

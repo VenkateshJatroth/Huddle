@@ -26,6 +26,7 @@ import {
   type CommunityChannel,
   type PostAudience,
 } from "../../lib/posts";
+import { compressImage } from "../../utils/imageCompression";
 import { AudioRecorderSection } from "../../components/AudioRecorderSection";
 import { useAppColors } from "../../theme/colors";
 
@@ -75,7 +76,8 @@ export default function CreateScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedImageUri(result.assets[0].uri);
+        const { uri: compressed } = await compressImage(result.assets[0].uri, { type: "feed" });
+        setSelectedImageUri(compressed);
       }
     } catch {
       Alert.alert("Error", "Could not open photo gallery.");

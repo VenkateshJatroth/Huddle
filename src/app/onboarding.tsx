@@ -20,6 +20,7 @@ import {
   upsertGormatiProfile,
 } from "../lib/gormati-profiles";
 import type { GormatiProfileDraft } from "../lib/gormati-profiles";
+import { compressImage } from "../utils/imageCompression";
 import { useAppColors } from "../theme/colors";
 
 const DATING_INTENTIONS = ["Long-term", "Friends", "Casual", "Unsure"];
@@ -75,7 +76,8 @@ export default function OnboardingScreen() {
 
     if (result.canceled || !result.assets[0]) return;
 
-    const localUri = result.assets[0].uri;
+    const rawUri = result.assets[0].uri;
+    const { uri: localUri } = await compressImage(rawUri, { type: "avatar" });
     setAvatarUri(localUri);
     setIsUploadingPhoto(true);
     setErrorMsg(null);
