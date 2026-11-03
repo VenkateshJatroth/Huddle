@@ -34,9 +34,9 @@ jobs:
       - name: Prepare Landing Page & CNAME
         run: |
           # Ensure CNAME exists in the deployment root
-          printf "joinhuddle.me\n" > ./landing-page/CNAME
+          printf "joinhuddl.me\n" > ./landing-page/CNAME
           touch ./landing-page/.nojekyll
-          # Support both root domain (joinhuddle.me) and repository subfolder (/Huddle/)
+          # Support both root domain (joinhuddl.me) and repository subfolder (/Huddle/)
           mkdir -p ./landing-page/Huddle
           cp -r ./landing-page/index.html ./landing-page/assets ./landing-page/Huddle/
 
