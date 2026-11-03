@@ -9,6 +9,7 @@ on:
       - ".github/workflows/deploy-landing.yml"
       - "CNAME"
       - "index.html"
+      - ".nojekyll"
   workflow_dispatch:
 
 permissions:
@@ -30,16 +31,19 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
       - name: Prepare Landing Page & CNAME
         run: |
           # Ensure CNAME exists in the deployment root
-          echo "joinhuddle.me" > ./landing-page/CNAME
+          printf "joinhuddle.me\n" > ./landing-page/CNAME
+          touch ./landing-page/.nojekyll
           # Support both root domain (joinhuddle.me) and repository subfolder (/Huddle/)
           mkdir -p ./landing-page/Huddle
           cp -r ./landing-page/index.html ./landing-page/assets ./landing-page/Huddle/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+        with:
+          enable_jekyll: false
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
@@ -49,4 +53,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
