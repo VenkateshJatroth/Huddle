@@ -1,5 +1,4 @@
 import { supabase } from "./supabase";
-import { generateCallChannelId } from "./agora";
 
 export type CallType = "voice" | "video";
 export type CallStatus = "ringing" | "connected" | "ended" | "declined" | "missed";
@@ -44,7 +43,7 @@ export async function startCall(
   callerAvatar?: string | null,
 ): Promise<CallSession> {
   const callUid = `call_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-  const channelId = generateCallChannelId(callUid);
+  const channelId = `huddle_${callUid.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 48)}`;
   const roomUrl = `https://meet.huddle.app/${channelId}`;
 
   const { data } = await (supabase as any)

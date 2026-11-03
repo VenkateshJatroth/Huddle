@@ -36,6 +36,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CHANGE_NETWORK_STATE",
         "android.permission.INTERNET",
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_CONNECT",
@@ -48,13 +49,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      [
-        "react-native-agora",
-        {
-          "cameraPermission": "Huddle needs camera access for video calls.",
-          "microphonePermission": "Huddle needs microphone access for voice and video calls."
-        }
-      ],
+      "@config-plugins/react-native-webrtc",
       "expo-router",
       [
         "expo-splash-screen",

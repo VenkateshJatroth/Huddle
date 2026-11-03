@@ -22,16 +22,21 @@ import {
   type CallStatus,
   type CallType,
 } from "../../lib/calling";
+import { supabase } from "../../lib/supabase";
 import {
-  AGORA_APP_ID,
-  ChannelProfileType,
-  ClientRoleType,
-  createAgoraRtcEngine,
-  generateCallChannelId,
-  isAgoraSupported,
-  RtcSurfaceView,
-  type IRtcEngine,
-} from "../../lib/agora";
+  getLocalStream,
+  isWebRTCSupported,
+  PEER_CONNECTION_CONFIG,
+  RTCIceCandidate,
+  RTCPeerConnection,
+  RTCSessionDescription,
+  RTCView,
+  stopMediaStream,
+  switchCamera,
+  toggleAudioTrack,
+  toggleVideoTrack,
+  type MediaStream,
+} from "../../services/webrtc";
 
 export type CallScreenProps = {
   memberId: string;
@@ -39,7 +44,6 @@ export type CallScreenProps = {
   callType?: CallType;
   isIncoming?: boolean;
   channelId?: string;
-  agoraToken?: string;
   onCallEnd?: () => void;
 };
 
@@ -48,44 +52,72 @@ export function CallScreen({
   callId,
   callType = "voice",
   isIncoming = false,
-  channelId: initialChannelId,
-  agoraToken = "",
+  channelId: _channelId,
   onCallEnd,
 }: CallScreenProps) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const currentUserId = user?.id;
 
   const [member, setMember] = useState<GormatiProfile | null>(null);
-  const [callStatus, setCallStatus] = useState<CallStatus>(isIncoming ? "ringing" : "ringing");
+  const [callStatus, setCallStatus] = useState<CallStatus>("ringing");
   const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(callType === "video");
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isFrontCamera, setIsFrontCamera] = useState(true);
 
-  // Agora State
-  const [isJoined, setIsJoined] = useState(false);
-  const [remoteUid, setRemoteUid] = useState<number | null>(null);
-  const engineRef = useRef<IRtcEngine | null>(null);
+  // WebRTC Media Streams & Peer Connection
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isPeerConnected, setIsPeerConnected] = useState(false);
 
-  // Animation for voice visualizer
+  const pcRef = useRef<any>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const candidateQueueRef = useRef<any[]>([]);
+  const signalingChannelRef = useRef<any>(null);
+  const isEndingRef = useRef(false);
+
+  // Pulse animation for voice audio visualizer
   const [pulseAnim] = useState(() => new Animated.Value(1));
 
-  const resolvedChannelId =
-    initialChannelId || generateCallChannelId(callId || `call_${memberId}`);
+  const resolvedCallId = callId || `call_${memberId}`;
 
-  // Safe navigation back / cleanup
+  // Safe hangup / cleanup
   const handleEndCall = useCallback(() => {
+    if (isEndingRef.current) return;
+    isEndingRef.current = true;
+
+    // 1. Broadcast call-ended on WebRTC signaling channel
     try {
-      if (engineRef.current) {
-        engineRef.current.leaveChannel();
-        engineRef.current.release();
-        engineRef.current = null;
+      if (signalingChannelRef.current) {
+        void signalingChannelRef.current.send({
+          type: "broadcast",
+          event: "call-ended",
+          payload: { callId: resolvedCallId, senderId: currentUserId },
+        });
       }
     } catch {
-      // Guard against double release
+      // Non-blocking
     }
 
+    // 2. Stop local media stream hardware
+    if (localStreamRef.current) {
+      stopMediaStream(localStreamRef.current);
+      localStreamRef.current = null;
+    }
+
+    // 3. Close RTCPeerConnection
+    if (pcRef.current) {
+      try {
+        pcRef.current.close();
+      } catch {
+        // Guard
+      }
+      pcRef.current = null;
+    }
+
+    // 4. Update status in database
     if (callId) {
       void updateCallStatus(callId, "ended");
     }
@@ -102,7 +134,7 @@ export function CallScreen({
         }
       }, 500);
     }
-  }, [callId, onCallEnd]);
+  }, [callId, currentUserId, onCallEnd, resolvedCallId]);
 
   // Load target member profile
   useEffect(() => {
@@ -170,76 +202,203 @@ export function CallScreen({
     };
   }, [callStatus]);
 
-  // Initialize Agora RTC Engine when call starts
+  // Initialize WebRTC Peer Connection & Supabase Realtime Broadcast Signaling
   useEffect(() => {
-    if (!isAgoraSupported || !AGORA_APP_ID) return;
-
     let isMounted = true;
+    isEndingRef.current = false;
 
-    try {
-      const engine = createAgoraRtcEngine();
-      engineRef.current = engine;
-
-      engine.initialize({
-        appId: AGORA_APP_ID,
-        channelProfile: ChannelProfileType.ChannelProfileCommunication,
-      });
-
-      engine.registerEventHandler({
-        onJoinChannelSuccess: (_connection, _elapsed) => {
-          if (!isMounted) return;
-          setIsJoined(true);
-        },
-        onUserJoined: (_connection, uid, _elapsed) => {
-          if (!isMounted) return;
-          setRemoteUid(uid);
-          setCallStatus("connected");
-        },
-        onUserOffline: (_connection, _uid, _reason) => {
-          if (!isMounted) return;
-          setRemoteUid(null);
-          handleEndCall();
-        },
-        onError: (err, msg) => {
-          console.warn("Agora RTC Engine Error:", err, msg);
-        },
-      });
-
-      if (callType === "video") {
-        engine.enableVideo();
-        engine.startPreview();
-      } else {
-        engine.enableAudio();
-      }
-
-      engine.setEnableSpeakerphone(isSpeakerOn);
-
-      engine.joinChannel(agoraToken || "", resolvedChannelId, 0, {
-        clientRoleType: ClientRoleType.ClientRoleBroadcaster,
-        publishMicrophoneTrack: true,
-        publishCameraTrack: callType === "video",
-        autoSubscribeAudio: true,
-        autoSubscribeVideo: callType === "video",
-      });
-    } catch (err) {
-      console.warn("Failed to initialize Agora RTC engine:", err);
+    if (!isWebRTCSupported) {
+      console.warn("WebRTC is not supported in this runtime environment.");
+      return;
     }
+
+    // 1. Join Supabase Realtime broadcast channel: call:<callId>
+    const signalingChannel = supabase.channel(`call:${resolvedCallId}`, {
+      config: { broadcast: { self: false } },
+    });
+    signalingChannelRef.current = signalingChannel;
+
+    // 2. Instantiate RTCPeerConnection with Google STUN servers
+    let pc: any = null;
+    try {
+      pc = new RTCPeerConnection(PEER_CONNECTION_CONFIG);
+      pcRef.current = pc;
+    } catch (err) {
+      console.warn("Failed to construct RTCPeerConnection:", err);
+      return;
+    }
+
+    // 3. Listen for remote media tracks
+    pc.addEventListener("track", (event: any) => {
+      if (!isMounted) return;
+      if (event.streams && event.streams[0]) {
+        setRemoteStream(event.streams[0]);
+        setCallStatus("connected");
+        setIsPeerConnected(true);
+      }
+    });
+
+    // 4. Listen for ICE candidates and broadcast to peer
+    pc.addEventListener("icecandidate", (event: any) => {
+      if (event.candidate) {
+        signalingChannel.send({
+          type: "broadcast",
+          event: "ice-candidate",
+          payload: {
+            candidate: event.candidate.toJSON(),
+            senderId: currentUserId,
+          },
+        });
+      }
+    });
+
+    // 5. Monitor peer connection state changes
+    pc.addEventListener("connectionstatechange", () => {
+      if (!isMounted) return;
+      if (pc.connectionState === "connected") {
+        setCallStatus("connected");
+        setIsPeerConnected(true);
+      } else if (
+        pc.connectionState === "disconnected" ||
+        pc.connectionState === "failed" ||
+        pc.connectionState === "closed"
+      ) {
+        setIsPeerConnected(false);
+      }
+    });
+
+    // 6. Register Realtime Signaling Event Listeners
+    signalingChannel
+      .on("broadcast", { event: "sdp-offer" }, async ({ payload }) => {
+        if (!isMounted || !pc || payload.senderId === currentUserId) return;
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription({ type: payload.type, sdp: payload.sdp }));
+
+          // Flush any early arriving ICE candidates
+          while (candidateQueueRef.current.length > 0) {
+            const cand = candidateQueueRef.current.shift();
+            if (cand) {
+              await pc.addIceCandidate(new RTCIceCandidate(cand));
+            }
+          }
+
+          // Create answer & broadcast back to caller
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await signalingChannel.send({
+            type: "broadcast",
+            event: "sdp-answer",
+            payload: {
+              sdp: answer.sdp,
+              type: answer.type,
+              senderId: currentUserId,
+            },
+          });
+          setCallStatus("connected");
+        } catch (err) {
+          console.warn("Error handling sdp-offer:", err);
+        }
+      })
+      .on("broadcast", { event: "sdp-answer" }, async ({ payload }) => {
+        if (!isMounted || !pc || payload.senderId === currentUserId) return;
+        try {
+          if (pc.signalingState !== "closed") {
+            await pc.setRemoteDescription(new RTCSessionDescription({ type: payload.type, sdp: payload.sdp }));
+
+            // Flush any early arriving ICE candidates
+            while (candidateQueueRef.current.length > 0) {
+              const cand = candidateQueueRef.current.shift();
+              if (cand) {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              }
+            }
+            setCallStatus("connected");
+          }
+        } catch (err) {
+          console.warn("Error handling sdp-answer:", err);
+        }
+      })
+      .on("broadcast", { event: "ice-candidate" }, async ({ payload }) => {
+        if (!isMounted || !pc || payload.senderId === currentUserId) return;
+        try {
+          if (pc.remoteDescription && pc.remoteDescription.type) {
+            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+          } else {
+            // Queue until remote description is set
+            candidateQueueRef.current.push(payload.candidate);
+          }
+        } catch (err) {
+          console.warn("Error handling ice-candidate:", err);
+        }
+      })
+      .on("broadcast", { event: "call-ended" }, ({ payload }) => {
+        if (!isMounted || payload.senderId === currentUserId) return;
+        handleEndCall();
+      });
+
+    // 7. Subscribe to signaling channel and start local media
+    signalingChannel.subscribe(async (status) => {
+      if (status !== "SUBSCRIBED" || !isMounted) return;
+
+      try {
+        // Acquire local microphone / camera
+        const stream = await getLocalStream(callType === "video");
+        if (!isMounted) {
+          if (stream) stopMediaStream(stream);
+          return;
+        }
+
+        if (stream) {
+          localStreamRef.current = stream;
+          setLocalStream(stream);
+
+          // Add local tracks to peer connection
+          stream.getTracks().forEach((track) => {
+            pc.addTrack(track, stream);
+          });
+        }
+
+        // Caller initiates the SDP offer
+        if (!isIncoming) {
+          const offer = await pc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: callType === "video",
+          });
+          await pc.setLocalDescription(offer);
+          await signalingChannel.send({
+            type: "broadcast",
+            event: "sdp-offer",
+            payload: {
+              sdp: offer.sdp,
+              type: offer.type,
+              senderId: currentUserId,
+            },
+          });
+        }
+      } catch (err) {
+        console.warn("Error in WebRTC initialization flow:", err);
+      }
+    });
 
     return () => {
       isMounted = false;
       try {
-        if (engineRef.current) {
-          engineRef.current.leaveChannel();
-          engineRef.current.release();
-          engineRef.current = null;
+        if (localStreamRef.current) {
+          stopMediaStream(localStreamRef.current);
+          localStreamRef.current = null;
         }
+        if (pcRef.current) {
+          pcRef.current.close();
+          pcRef.current = null;
+        }
+        void supabase.removeChannel(signalingChannel);
       } catch {
         // Safe guard
       }
     };
-  }, [agoraToken, callType, resolvedChannelId, handleEndCall, isSpeakerOn]);
+  }, [callType, currentUserId, handleEndCall, isIncoming, resolvedCallId]);
 
-  // Subscribe to live call updates if callId exists
+  // Subscribe to call session updates in Supabase database
   useEffect(() => {
     if (!callId) return;
     const unsub = subscribeToCall(callId, (session) => {
@@ -255,48 +414,26 @@ export function CallScreen({
     return unsub;
   }, [callId, handleEndCall]);
 
-  // Caller controls
+  // Media controls
   const handleToggleMute = () => {
     const next = !isMuted;
     setIsMuted(next);
-    try {
-      engineRef.current?.muteLocalAudioStream(next);
-    } catch (e) {
-      console.warn("Agora muteLocalAudioStream error:", e);
-    }
+    toggleAudioTrack(localStreamRef.current, !next);
   };
 
   const handleToggleVideo = () => {
     const next = !isVideoEnabled;
     setIsVideoEnabled(next);
-    try {
-      engineRef.current?.muteLocalVideoStream(!next);
-      if (next) {
-        engineRef.current?.enableVideo();
-        engineRef.current?.startPreview();
-      }
-    } catch (e) {
-      console.warn("Agora muteLocalVideoStream error:", e);
-    }
+    toggleVideoTrack(localStreamRef.current, next);
   };
 
   const handleSwitchCamera = () => {
-    try {
-      engineRef.current?.switchCamera();
-      setIsFrontCamera((prev) => !prev);
-    } catch (e) {
-      console.warn("Agora switchCamera error:", e);
-    }
+    switchCamera(localStreamRef.current);
+    setIsFrontCamera((prev) => !prev);
   };
 
   const handleToggleSpeaker = () => {
-    const next = !isSpeakerOn;
-    setIsSpeakerOn(next);
-    try {
-      engineRef.current?.setEnableSpeakerphone(next);
-    } catch (e) {
-      console.warn("Agora setEnableSpeakerphone error:", e);
-    }
+    setIsSpeakerOn((prev) => !prev);
   };
 
   const handleAcceptCall = () => {
@@ -318,13 +455,15 @@ export function CallScreen({
 
   return (
     <View style={[styles.container, { backgroundColor: "#0A0A0C" }]}>
-      {/* Video Viewport (Remote Video or Fallback) */}
+      {/* Video Viewport: Render Remote Stream or Profile Fallback */}
       {isVideo && isVideoEnabled ? (
         <View style={styles.fullScreenVideo}>
-          {isAgoraSupported && remoteUid !== null ? (
-            <RtcSurfaceView
+          {remoteStream ? (
+            <RTCView
+              streamURL={remoteStream.toURL()}
               style={styles.fullScreenVideo}
-              canvas={{ uid: remoteUid }}
+              objectFit="cover"
+              zOrder={0}
             />
           ) : member?.gallery_urls?.[0] || member?.avatar_url ? (
             <Image
@@ -338,26 +477,32 @@ export function CallScreen({
             </View>
           )}
 
-          {/* Floating Self View (Picture in Picture) */}
-          <View style={[styles.pipCard, { top: insets.top + 50 }]}>
-            {isAgoraSupported ? (
-              <RtcSurfaceView
+          {/* Floating Local Camera View (Picture in Picture) */}
+          {localStream ? (
+            <View style={[styles.pipCard, { top: insets.top + 50 }]}>
+              <RTCView
+                streamURL={localStream.toURL()}
                 style={styles.pipVideo}
-                canvas={{ uid: 0 }}
-                zOrderMediaOverlay={true}
+                objectFit="cover"
+                mirror={isFrontCamera}
+                zOrder={1}
               />
-            ) : user?.user_metadata?.avatar_url ? (
-              <Image
-                source={{ uri: user.user_metadata.avatar_url }}
-                style={styles.pipImage}
-                contentFit="cover"
-              />
-            ) : (
-              <View style={styles.pipPlaceholder}>
-                <Icon name="person" color="#FFFFFF" size={24} />
-              </View>
-            )}
-          </View>
+            </View>
+          ) : (
+            <View style={[styles.pipCard, { top: insets.top + 50 }]}>
+              {user?.user_metadata?.avatar_url ? (
+                <Image
+                  source={{ uri: user.user_metadata.avatar_url }}
+                  style={styles.pipImage}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.pipPlaceholder}>
+                  <Icon name="person" color="#FFFFFF" size={24} />
+                </View>
+              )}
+            </View>
+          )}
         </View>
       ) : (
         /* Voice Call Viewport */
@@ -422,7 +567,7 @@ export function CallScreen({
           />
           <Text style={styles.statusText}>
             {callStatus === "connected"
-              ? `${formatTimer(callDuration)}${isJoined ? " · Agora P2P" : ""}`
+              ? `${formatTimer(callDuration)}${isPeerConnected ? " · P2P" : ""}`
               : callStatus === "ringing"
                 ? isIncoming
                   ? "Incoming..."
@@ -438,7 +583,9 @@ export function CallScreen({
       {callStatus === "ringing" && !isIncoming ? (
         <View style={styles.ringingOverlay}>
           <ActivityIndicator color="#FFFFFF" size="small" />
-          <Text style={styles.ringingText}>Connecting securely via Agora P2P…</Text>
+          <Text style={styles.ringingText}>
+            {isWebRTCSupported ? "Connecting WebRTC P2P…" : "Connecting voice/video stream…"}
+          </Text>
         </View>
       ) : null}
 
@@ -744,4 +891,3 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
-

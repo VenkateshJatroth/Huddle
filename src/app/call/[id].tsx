@@ -9,14 +9,12 @@ export default function CallRoute() {
     type = "voice",
     incoming = "false",
     channelId,
-    token,
   } = useLocalSearchParams<{
     id: string;
     callId?: string;
     type?: CallType;
     incoming?: string;
     channelId?: string;
-    token?: string;
   }>();
 
   return (
@@ -26,7 +24,6 @@ export default function CallRoute() {
       callType={type}
       isIncoming={incoming === "true"}
       channelId={channelId}
-      agoraToken={token}
     />
   );
 }
