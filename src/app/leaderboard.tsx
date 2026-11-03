@@ -2,7 +2,6 @@ import { useFocusEffect, useNavigation, router } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  BackHandler,
   FlatList,
   Pressable,
   RefreshControl,
@@ -42,17 +41,6 @@ export default function LeaderboardScreen() {
       router.replace("/(tabs)");
     }
   }, [navigation]);
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = () => {
-        handleBack();
-        return true;
-      };
-      const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-      return () => sub.remove();
-    }, [handleBack]),
-  );
 
   const loadData = useCallback(async () => {
     try {

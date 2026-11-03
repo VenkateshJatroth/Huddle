@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
-  BackHandler,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -43,15 +42,6 @@ export default function SettingsScreen() {
       router.replace("/(tabs)");
     }
   }, []);
-
-  useEffect(() => {
-    const onBackPress = () => {
-      handleBack();
-      return true;
-    };
-    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-    return () => sub.remove();
-  }, [handleBack]);
 
   const [notifications, setNotifications] = useState<NotificationSettings>(() => {
     try {

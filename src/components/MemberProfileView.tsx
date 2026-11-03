@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  BackHandler,
   Dimensions,
   Modal,
   Pressable,
@@ -85,15 +84,6 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
     }
     router.replace("/(tabs)");
   }, [onBack]);
-
-  useEffect(() => {
-    const onBackPress = () => {
-      handleBack();
-      return true;
-    };
-    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-    return () => sub.remove();
-  }, [handleBack]);
 
   useEffect(() => {
     let isCurrent = true;

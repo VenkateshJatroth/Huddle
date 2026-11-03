@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import {
   Alert,
-  BackHandler,
   Modal,
   Pressable,
   RefreshControl,
@@ -60,17 +59,6 @@ export default function EventsScreen() {
       router.replace("/(tabs)");
     }
   }, [navigation]);
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = () => {
-        handleBack();
-        return true;
-      };
-      const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-      return () => sub.remove();
-    }, [handleBack]),
-  );
 
   const loadEvents = useCallback(async () => {
     setRefreshing(true);

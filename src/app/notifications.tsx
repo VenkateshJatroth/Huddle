@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  BackHandler,
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -35,41 +35,12 @@ export default function NotificationsScreen() {
   const [busyFollowId, setBusyFollowId] = useState<string | null>(null);
 
   const handleBack = useCallback(() => {
-    try {
-      if (router.canGoBack()) {
-        router.back();
-        return;
-      }
-    } catch {
-      // Fallback
-    }
-    try {
-      router.replace("/(tabs)" as never);
-    } catch {
-      try {
-        router.navigate("/(tabs)" as never);
-      } catch {
-        // Safe fallback
-      }
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
     }
   }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = () => {
-        handleBack();
-        return true;
-      };
-      const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-      return () => {
-        try {
-          sub.remove();
-        } catch {
-          // Safe removal
-        }
-      };
-    }, [handleBack]),
-  );
 
   const loadNotifs = useCallback(async () => {
     setIsLoading(true);
@@ -91,6 +62,7 @@ export default function NotificationsScreen() {
     }
   }, [user]);
 
+  // Refresh whenever screen mounts or gains focus
   useFocusEffect(
     useCallback(() => {
       void loadNotifs();
@@ -191,14 +163,10 @@ export default function NotificationsScreen() {
           <ActivityIndicator color={colors.accent} size="large" />
           <Text style={[styles.loadingText, { color: colors.secondary }]}>Loading notifications…</Text>
         </View>
-      ) : (
-        <FlatList
-          data={notifications}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={[
-            styles.listContent,
-            notifications.length === 0 && styles.listContentEmpty,
-          ]}
+      ) : notifications.length === 0 ? (
+        <ScrollView
+          style={styles.emptyScroll}
+          contentContainerStyle={styles.emptyContainer}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -207,25 +175,37 @@ export default function NotificationsScreen() {
               colors={[colors.accent]}
             />
           }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <View style={[styles.emptyIconCircle, { backgroundColor: colors.subtle }]}>
-                <Icon name="bell" color={colors.accent} size={32} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                No new notifications yet
-              </Text>
-              <Text style={[styles.emptySubtitle, { color: colors.secondary }]}>
-                You’re all caught up! New connections, likes, comments, and community updates will appear here.
-              </Text>
-              <View style={{ marginTop: 14 }}>
-                <AppButton
-                  label="Explore Community"
-                  variant="primary"
-                  onPress={handleBack}
-                />
-              </View>
-            </View>
+        >
+          <View style={[styles.emptyIconCircle, { backgroundColor: colors.subtle }]}>
+            <Icon name="bell" color={colors.accent} size={32} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            No notifications yet
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: colors.secondary }]}>
+            You’re all caught up! New connections, likes, comments, and community updates will appear here.
+          </Text>
+          <View style={{ marginTop: 14 }}>
+            <AppButton
+              label="Explore Community"
+              variant="primary"
+              onPress={handleBack}
+            />
+          </View>
+        </ScrollView>
+      ) : (
+        <FlatList
+          style={styles.list}
+          data={notifications}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => { void onRefresh(); }}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
           }
           renderItem={({ item }) => {
             const actorName = item?.actor_name?.trim() || "Huddle Member";
@@ -322,9 +302,11 @@ const styles = StyleSheet.create({
   unreadBadgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
   loadingText: { fontSize: 13 },
+  list: { flex: 1 },
   listContent: { padding: 16, gap: 10 },
   listContentEmpty: { flexGrow: 1, justifyContent: "center" },
-  emptyContainer: { alignItems: "center", justifyContent: "center", paddingVertical: 40, paddingHorizontal: 24, gap: 10 },
+  emptyScroll: { flex: 1 },
+  emptyContainer: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40, paddingHorizontal: 24, gap: 10 },
   emptyIconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", marginBottom: 6 },
   emptyTitle: { fontSize: 18, fontWeight: "800", textAlign: "center" },
   emptySubtitle: { fontSize: 13, lineHeight: 18, textAlign: "center", paddingHorizontal: 16 },

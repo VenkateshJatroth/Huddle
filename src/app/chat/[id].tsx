@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  BackHandler,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -65,15 +64,6 @@ export default function ChatScreen() {
       router.replace("/(tabs)");
     }
   }, []);
-
-  useEffect(() => {
-    const onBackPress = () => {
-      handleBack();
-      return true;
-    };
-    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-    return () => sub.remove();
-  }, [handleBack]);
 
   // Load member details & initial messages
   useEffect(() => {

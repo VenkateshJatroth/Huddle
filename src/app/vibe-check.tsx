@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
-  BackHandler,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -70,15 +69,6 @@ export default function VibeCheckScreen() {
       ],
     );
   }, []);
-
-  useEffect(() => {
-    const onBackPress = () => {
-      handleBack();
-      return true;
-    };
-    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-    return () => sub.remove();
-  }, [handleBack]);
 
   // Load a potential partner profile for discovery
   useEffect(() => {

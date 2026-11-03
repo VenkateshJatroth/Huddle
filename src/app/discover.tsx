@@ -1,8 +1,7 @@
 import { useFocusEffect, router } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  BackHandler,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -65,15 +64,6 @@ export default function DiscoverScreen() {
       router.replace("/(tabs)");
     }
   }, []);
-
-  useEffect(() => {
-    const onBackPress = () => {
-      handleBack();
-      return true;
-    };
-    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-    return () => sub.remove();
-  }, [handleBack]);
 
   // Subscribe to blocked users changes
   useFocusEffect(
