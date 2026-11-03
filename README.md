@@ -11,8 +11,8 @@
 
 <!-- Top Hero Action Badges -->
 <p align="center">
-  <a href="https://venkateshjatroth.github.io/Huddle/">
-    <img src="https://img.shields.io/badge/%F0%9F%8C%90%20Live%20Website-Visit%20Landing%20Page-ec4899?style=for-the-badge" alt="Live Website" />
+  <a href="https://joinhuddle.me">
+    <img src="https://img.shields.io/badge/%F0%9F%8C%90%20Live%20Website-joinhuddle.me-ec4899?style=for-the-badge" alt="Live Website" />
   </a>
   <a href="https://expo.dev/artifacts/eas/YDrbENeKJra9P7ZGWrr4xxWax8_dWuZaiRNq7ktWsuI.apk">
     <img src="https://img.shields.io/badge/%F0%9F%93%B2%20Download%20APK-Android%20v1.2%20(WebRTC)-8b5cf6?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" />
@@ -40,8 +40,8 @@
 
 Get Huddle running on your Android device in seconds without Google Play:
 
-1. **Visit the Live Landing Page:**  
-   👉 **[https://venkateshjatroth.github.io/Huddle/](https://venkateshjatroth.github.io/Huddle/)**
+1. **Visit the Live Website:**  
+   👉 **[https://joinhuddle.me](https://joinhuddle.me)**
 
 2. **Direct One-Click APK Download:**  
    👉 **[Download Huddle APK v1.2 (Direct .apk)](https://expo.dev/artifacts/eas/YDrbENeKJra9P7ZGWrr4xxWax8_dWuZaiRNq7ktWsuI.apk)**

@@ -3,20 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Huddle: Let's Connect — Official Android APK Download</title>
-  <meta name="description" content="Download Huddle v1.2 for Android. The next-generation social app featuring real-time WebRTC voice & video calling, anonymous confessions, secret sparks, and daily hot take battles." />
+  <title>Huddle: Let's Connect — Official Website & Android APK</title>
+  <meta name="description" content="Download Huddle for Android at joinhuddle.me. The authentic mobile social platform featuring real-time WebRTC 1-on-1 voice & video calling, anonymous confessions, secret sparks, and daily hot take battles." />
   <meta name="theme-color" content="#000000" />
+  <link rel="canonical" href="https://joinhuddle.me" />
 
   <!-- Open Graph / Social Sharing -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="Huddle: Let's Connect — Download Android App" />
-  <meta property="og:description" content="Experience real-time 1-on-1 voice & video calling, anonymous confessions, secret compliments, and authentic community connections." />
-  <meta property="og:image" content="assets/logo.png" />
+  <meta property="og:url" content="https://joinhuddle.me" />
+  <meta property="og:title" content="Huddle: Let's Connect — Official Website (joinhuddle.me)" />
+  <meta property="og:description" content="Real-time WebRTC voice & video calling, anonymous confessions, secret compliments, and daily hot takes. Download the verified Android APK now." />
+  <meta property="og:image" content="https://joinhuddle.me/assets/logo.png" />
+
+  <!-- Twitter Meta -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Huddle: Let's Connect (joinhuddle.me)" />
+  <meta name="twitter:description" content="Real-time WebRTC calling, anonymous confessions, and authentic community." />
+  <meta name="twitter:image" content="https://joinhuddle.me/assets/logo.png" />
+
+  <link rel="icon" type="image/png" href="assets/icon.png" />
 
   <!-- Google Fonts & Tailwind CSS CDN -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -25,6 +35,7 @@
         extend: {
           fontFamily: {
             sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
           },
           colors: {
             brand: {
@@ -32,19 +43,24 @@
               rose: '#f43f5e',
               purple: '#8b5cf6',
               indigo: '#6366f1',
-              dark: '#09090b',
-              surface: '#121216',
-              card: '#18181f',
-              border: '#272733',
+              dark: '#08080a',
+              surface: '#111116',
+              card: '#16161d',
+              border: '#242430',
             }
           },
           animation: {
             'glow-pulse': 'glow 3s ease-in-out infinite alternate',
+            'float': 'float 5s ease-in-out infinite alternate',
           },
           keyframes: {
             glow: {
-              '0%': { boxShadow: '0 0 20px rgba(236, 72, 153, 0.35), 0 0 40px rgba(139, 92, 246, 0.2)' },
-              '100%': { boxShadow: '0 0 35px rgba(236, 72, 153, 0.65), 0 0 65px rgba(139, 92, 246, 0.45)' },
+              '0%': { boxShadow: '0 0 25px rgba(236, 72, 153, 0.35), 0 0 50px rgba(139, 92, 246, 0.2)' },
+              '100%': { boxShadow: '0 0 45px rgba(236, 72, 153, 0.7), 0 0 80px rgba(139, 92, 246, 0.5)' },
+            },
+            float: {
+              '0%': { transform: 'translateY(0px)' },
+              '100%': { transform: 'translateY(-10px)' },
             }
           }
         }
@@ -52,7 +68,7 @@
     }
   </script>
 
-  <!-- Lucide Icons -->
+  <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
@@ -65,50 +81,71 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-    .gradient-border {
-      background: linear-gradient(135deg, rgba(236, 72, 153, 0.4), rgba(139, 92, 246, 0.4));
+    .gradient-border-btn {
+      position: relative;
+      border: 1px solid transparent;
+      background-clip: padding-box;
+    }
+    .gradient-border-btn::after {
+      position: absolute;
+      top: -1px; bottom: -1px; left: -1px; right: -1px;
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      content: '';
+      z-index: -1;
+      border-radius: inherit;
     }
     .glass {
-      background: rgba(18, 18, 22, 0.75);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      background: rgba(14, 14, 18, 0.82);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    .tab-active {
+      background: rgba(236, 72, 153, 0.15);
+      border-color: #ec4899;
+      color: #ffffff;
     }
   </style>
 </head>
-<body class="min-h-screen antialiased selection:bg-pink-500 selection:text-white relative overflow-x-hidden">
+<body class="min-h-screen antialiased selection:bg-pink-500 selection:text-white relative overflow-x-hidden font-sans">
 
-  <!-- Ambient Glow Backgrounds -->
+  <!-- Ambient Glow Effects -->
   <div class="fixed inset-0 pointer-events-none z-0">
-    <div class="absolute -top-40 -left-40 w-96 h-96 bg-pink-600/15 rounded-full blur-[140px]"></div>
-    <div class="absolute top-1/3 -right-40 w-96 h-96 bg-purple-600/15 rounded-full blur-[160px]"></div>
-    <div class="absolute -bottom-40 left-1/3 w-96 h-96 bg-indigo-600/10 rounded-full blur-[140px]"></div>
+    <div class="absolute -top-40 -left-40 w-[500px] h-[500px] bg-pink-600/15 rounded-full blur-[160px]"></div>
+    <div class="absolute top-1/4 -right-40 w-[600px] h-[600px] bg-purple-600/15 rounded-full blur-[180px]"></div>
+    <div class="absolute bottom-1/3 left-1/4 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[170px]"></div>
   </div>
 
-  <!-- Header / Navigation -->
-  <header class="sticky top-0 z-50 glass border-b border-brand-border/60 transition-all duration-300">
+  <!-- Sticky Navbar -->
+  <header class="sticky top-0 z-50 glass border-b border-brand-border/70 transition-all duration-300">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-      <a href="#" class="flex items-center gap-3 group">
-        <div class="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-tr from-pink-500 to-purple-600 p-[2px] transition group-hover:scale-105">
+      <a href="https://joinhuddle.me" class="flex items-center gap-3 group">
+        <div class="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-tr from-pink-500 to-purple-600 p-[2px] transition group-hover:scale-105 shadow-md shadow-pink-500/20">
           <img src="assets/logo.png" alt="Huddle Logo" class="w-full h-full object-cover rounded-[10px] bg-black" />
         </div>
         <div class="flex flex-col">
-          <span class="text-xl font-extrabold tracking-tight text-white flex items-center gap-1.5">
+          <span class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
             Huddle
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400 border border-pink-500/30">v1.2</span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400 border border-pink-500/30">joinhuddle.me</span>
           </span>
           <span class="text-[11px] font-medium text-zinc-400">Let's connect</span>
         </div>
       </a>
 
-      <div class="flex items-center gap-3">
-        <a href="#features" class="hidden sm:inline-block text-xs font-semibold text-zinc-300 hover:text-white transition px-3 py-1.5">Features</a>
-        <a href="#install" class="hidden sm:inline-block text-xs font-semibold text-zinc-300 hover:text-white transition px-3 py-1.5">How to Install</a>
+      <div class="flex items-center gap-4">
+        <nav class="hidden md:flex items-center gap-5 text-xs font-semibold text-zinc-300">
+          <a href="#demo" class="hover:text-white transition">Live Preview</a>
+          <a href="#features" class="hover:text-white transition">Features</a>
+          <a href="#architecture" class="hover:text-white transition">Tech Stack</a>
+          <a href="#install" class="hover:text-white transition">Install Guide</a>
+        </nav>
+
         <a 
           href="https://expo.dev/artifacts/eas/YDrbENeKJra9P7ZGWrr4xxWax8_dWuZaiRNq7ktWsuI.apk" 
-          class="relative inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+          download
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold text-white bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
           <i data-lucide="download" class="w-4 h-4"></i>
-          <span>Download APK</span>
+          <span>Get APK</span>
         </a>
       </div>
     </div>
@@ -116,128 +153,393 @@
 
   <!-- Hero Section -->
   <main class="relative z-10">
-    <section class="pt-16 pb-20 px-4 sm:px-6 max-w-5xl mx-auto text-center">
-      <!-- Live Badge -->
-      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900 border border-pink-500/30 mb-8 shadow-inner">
+    <section class="pt-16 sm:pt-20 pb-16 px-4 sm:px-6 max-w-6xl mx-auto text-center">
+      <!-- Announcement Pill -->
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-zinc-900/90 border border-pink-500/30 mb-8 shadow-inner">
         <span class="flex h-2 w-2 relative">
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
           <span class="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
         </span>
-        <span class="text-xs font-semibold text-zinc-200">New Release: WebRTC Voice & Video Calling is Live!</span>
+        <span class="text-xs font-bold text-zinc-200">Official Release • Peer-to-Peer WebRTC Calling & Confessions</span>
       </div>
 
-      <!-- Main Headline -->
+      <!-- Headline & Tagline -->
       <h1 class="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white mb-6 leading-[1.1]">
         Huddle: <span class="gradient-text">Let's Connect</span>
       </h1>
 
       <p class="text-lg sm:text-xl text-zinc-300 max-w-2xl mx-auto mb-10 font-normal leading-relaxed">
-        The authentic mobile social community where you actually talk. 1-on-1 real-time voice & video calling, anonymous confessions, secret sparks, and daily hot take battles.
+        The authentic mobile social platform built for real conversation. 1-on-1 real-time voice & video calling, anonymous confessions, secret sparks, and daily hot take battles.
       </p>
 
-      <!-- CTA Buttons & Download Card -->
-      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto mb-14">
-        <a 
-          href="https://expo.dev/artifacts/eas/YDrbENeKJra9P7ZGWrr4xxWax8_dWuZaiRNq7ktWsuI.apk" 
-          download
-          class="w-full sm:w-auto flex-1 inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl text-base font-extrabold text-white bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 shadow-xl shadow-pink-500/30 hover:shadow-pink-500/50 hover:scale-[1.03] active:scale-[0.98] transition-all animate-glow-pulse"
-        >
-          <i data-lucide="smartphone" class="w-5 h-5"></i>
-          <div class="flex flex-col text-left">
-            <span class="leading-none text-xs text-pink-100 font-medium">Direct Android Download</span>
-            <span class="text-base font-bold leading-tight">Download APK v1.2</span>
-          </div>
-        </a>
-
-        <a 
-          href="https://expo.dev/accounts/venkateshjatroths-team/projects/huddle-social/builds/07459770-f109-448a-8d6d-49a04b22fc6d" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl text-sm font-bold text-zinc-200 bg-brand-surface border border-brand-border hover:border-zinc-500 hover:text-white transition-all"
-        >
-          <i data-lucide="qr-code" class="w-4 h-4 text-pink-400"></i>
-          <span>Scan QR Code</span>
-        </a>
-      </div>
-
-      <!-- Specs / Micro Info -->
-      <div class="flex flex-wrap items-center justify-center gap-6 text-xs text-zinc-400">
-        <span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-4 h-4 text-green-400"></i> Android 8.0+ Compatible</span>
-        <span class="flex items-center gap-1.5"><i data-lucide="shield-check" class="w-4 h-4 text-pink-400"></i> Signed & Verified Binary</span>
-        <span class="flex items-center gap-1.5"><i data-lucide="package" class="w-4 h-4 text-purple-400"></i> Size: ~48 MB</span>
-      </div>
-
-      <!-- App Preview Mockup Box -->
-      <div class="mt-14 relative max-w-sm mx-auto">
-        <div class="absolute -inset-1 rounded-[36px] bg-gradient-to-r from-pink-500 to-purple-600 opacity-30 blur-xl"></div>
-        <div class="relative bg-brand-surface border-2 border-brand-border rounded-[32px] p-5 shadow-2xl text-left overflow-hidden">
+      <!-- Dual Download Card: Mobile Button + Desktop QR Code -->
+      <div class="max-w-3xl mx-auto mb-16 bg-brand-surface/90 border border-brand-border rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
           
-          <!-- Mock Phone Status -->
-          <div class="flex justify-between items-center text-[11px] text-zinc-400 mb-4 px-1">
-            <span>9:41</span>
-            <div class="flex items-center gap-1.5">
-              <i data-lucide="wifi" class="w-3 h-3"></i>
-              <i data-lucide="battery-charging" class="w-3 h-3 text-green-400"></i>
+          <!-- Left: Direct Action Button & Mobile Download -->
+          <div class="md:col-span-7 text-left space-y-4">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-pink-500/15 border border-pink-500/25 text-pink-400 text-xs font-bold">
+              <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> Android Standalone APK (v1.2)
             </div>
-          </div>
-
-          <!-- Mock Incoming Call Floating Banner -->
-          <div class="bg-zinc-900/90 border border-pink-500/50 rounded-2xl p-3 flex items-center justify-between mb-4 shadow-lg">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center font-bold text-sm text-white">
-                SI
-              </div>
-              <div>
-                <p class="text-xs font-extrabold text-white">Sana Iqbal</p>
-                <p class="text-[10px] text-pink-400 font-medium">Incoming Video Call…</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center">
-                <i data-lucide="phone-off" class="w-4 h-4"></i>
-              </div>
-              <div class="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center animate-bounce">
-                <i data-lucide="phone" class="w-4 h-4"></i>
-              </div>
-            </div>
-          </div>
-
-          <!-- Mock Community Confession Card -->
-          <div class="bg-brand-card border border-brand-border rounded-2xl p-4 mb-3">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-xs font-bold text-purple-300">🎭 Anonymous Fox</span>
-              <span class="text-[10px] text-zinc-500">• 12m ago</span>
-            </div>
-            <p class="text-xs text-zinc-200 leading-relaxed font-normal">
-              "Honestly, the best conversations happen when you skip the small talk and jump right into what excites you. Huddle vibe checks are unmatched!"
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Ready to experience Huddle?
+            </h2>
+            <p class="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+              Native Android build bundled with raw WebRTC engine, Google STUN traversal, and instant Supabase Realtime broadcast signaling.
             </p>
-            <div class="flex items-center gap-4 mt-3 text-[11px] text-zinc-400">
-              <span class="flex items-center gap-1 text-pink-400 font-semibold"><i data-lucide="heart" class="w-3.5 h-3.5 fill-pink-500 text-pink-500"></i> 48</span>
-              <span class="flex items-center gap-1"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i> 14</span>
+
+            <div class="pt-2 flex flex-col sm:flex-row gap-3">
+              <a 
+                href="https://expo.dev/artifacts/eas/YDrbENeKJra9P7ZGWrr4xxWax8_dWuZaiRNq7ktWsuI.apk" 
+                download
+                class="inline-flex items-center justify-center gap-3 px-6 py-4 rounded-2xl text-base font-extrabold text-white bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 shadow-xl shadow-pink-500/35 hover:shadow-pink-500/55 hover:scale-[1.02] active:scale-[0.98] transition-all animate-glow-pulse"
+              >
+                <i data-lucide="download-cloud" class="w-5 h-5"></i>
+                <div class="flex flex-col text-left">
+                  <span class="text-[10px] uppercase tracking-wider text-pink-100 font-bold">Direct Mobile Download</span>
+                  <span class="text-sm sm:text-base font-extrabold">Download Android APK</span>
+                </div>
+              </a>
+
+              <a 
+                href="https://expo.dev/accounts/venkateshjatroths-team/projects/huddle-social/builds/07459770-f109-448a-8d6d-49a04b22fc6d" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold text-zinc-300 bg-brand-card border border-brand-border hover:border-zinc-500 hover:text-white transition"
+              >
+                <i data-lucide="external-link" class="w-4 h-4 text-purple-400"></i>
+                <span>EAS Dashboard</span>
+              </a>
+            </div>
+
+            <div class="flex items-center gap-4 pt-1 text-[11px] text-zinc-400">
+              <span class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-green-400"></i> Signed Binary</span>
+              <span class="flex items-center gap-1"><i data-lucide="hard-drive" class="w-3.5 h-3.5 text-pink-400"></i> 48.6 MB</span>
+              <span class="flex items-center gap-1"><i data-lucide="cpu" class="w-3.5 h-3.5 text-purple-400"></i> Android 8.0+</span>
             </div>
           </div>
 
-          <!-- Mock Instagram-Style Tab Bar -->
-          <div class="border-t border-brand-border/60 pt-3 flex justify-around text-zinc-400">
-            <i data-lucide="home" class="w-5 h-5 text-pink-400"></i>
-            <i data-lucide="users" class="w-5 h-5"></i>
-            <i data-lucide="plus-circle" class="w-5 h-5 text-purple-400"></i>
-            <i data-lucide="flame" class="w-5 h-5"></i>
-            <i data-lucide="user" class="w-5 h-5"></i>
+          <!-- Right: Desktop QR Code Card for Laptop Visitors -->
+          <div class="md:col-span-5 flex flex-col items-center justify-center bg-brand-card/80 border border-brand-border/80 rounded-2xl p-5 text-center">
+            <span class="text-xs font-bold text-zinc-300 mb-2 flex items-center gap-1.5">
+              <i data-lucide="qr-code" class="w-4 h-4 text-pink-400"></i> Scan to Download on Phone
+            </span>
+            <div class="p-2.5 rounded-xl bg-white shadow-lg mb-3">
+              <img 
+                src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fexpo.dev%2Fartifacts%2Feas%2FYDrbENeKJra9P7ZGWrr4xxWax8_dWuZaiRNq7ktWsuI.apk&margin=6&color=000000&bgcolor=ffffff" 
+                alt="Scan QR code to download Huddle APK" 
+                class="w-36 h-36 object-contain"
+              />
+            </div>
+            <p class="text-[11px] text-zinc-400 max-w-[200px]">
+              Point your smartphone camera at this code to download the APK directly.
+            </p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Interactive Smartphone Showcase with 4 Switchable Views -->
+      <div id="demo" class="mt-8 max-w-4xl mx-auto">
+        <div class="text-center mb-6">
+          <span class="text-xs font-bold uppercase tracking-widest text-pink-400">Interactive Prototype</span>
+          <h3 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Explore Huddle in Action</h3>
+          <p class="text-xs sm:text-sm text-zinc-400 mt-1">Click the tabs below to preview real screens from the application.</p>
+        </div>
+
+        <!-- Showcase Tab Selectors -->
+        <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-8">
+          <button onclick="switchScreen('call')" id="tab-call" class="tab-btn tab-active px-4 py-2.5 rounded-xl border border-brand-border text-xs sm:text-sm font-bold flex items-center gap-2 transition">
+            <i data-lucide="video" class="w-4 h-4 text-pink-400"></i>
+            <span>Live WebRTC Call</span>
+          </button>
+          <button onclick="switchScreen('confessions')" id="tab-confessions" class="tab-btn px-4 py-2.5 rounded-xl border border-brand-border bg-brand-surface text-zinc-400 text-xs sm:text-sm font-bold flex items-center gap-2 hover:text-white transition">
+            <i data-lucide="mask" class="w-4 h-4 text-purple-400"></i>
+            <span>Spill the Tea (Anonymous)</span>
+          </button>
+          <button onclick="switchScreen('hottakes')" id="tab-hottakes" class="tab-btn px-4 py-2.5 rounded-xl border border-brand-border bg-brand-surface text-zinc-400 text-xs sm:text-sm font-bold flex items-center gap-2 hover:text-white transition">
+            <i data-lucide="flame" class="w-4 h-4 text-orange-400"></i>
+            <span>Daily Hot Takes</span>
+          </button>
+          <button onclick="switchScreen('profile')" id="tab-profile" class="tab-btn px-4 py-2.5 rounded-xl border border-brand-border bg-brand-surface text-zinc-400 text-xs sm:text-sm font-bold flex items-center gap-2 hover:text-white transition">
+            <i data-lucide="user" class="w-4 h-4 text-rose-400"></i>
+            <span>Instagram-Style Profile</span>
+          </button>
+        </div>
+
+        <!-- Phone Frame Container -->
+        <div class="relative max-w-sm mx-auto">
+          <div class="absolute -inset-2 rounded-[42px] bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 opacity-25 blur-2xl"></div>
+          
+          <div class="relative bg-brand-dark border-4 border-zinc-800 rounded-[38px] p-4 shadow-2xl overflow-hidden min-h-[560px] flex flex-col justify-between text-left">
+            
+            <!-- Phone Notch & Status Bar -->
+            <div class="flex justify-between items-center text-[11px] text-zinc-400 px-2 pt-1 pb-3 border-b border-brand-border/40">
+              <span class="font-bold text-white">9:41</span>
+              <div class="w-20 h-4 bg-zinc-900 rounded-full border border-zinc-800"></div>
+              <div class="flex items-center gap-1.5 text-zinc-400">
+                <i data-lucide="wifi" class="w-3 h-3"></i>
+                <i data-lucide="battery-charging" class="w-3 h-3 text-green-400"></i>
+              </div>
+            </div>
+
+            <!-- Screen View 1: Live WebRTC Call (Default) -->
+            <div id="screen-call" class="screen-view py-3 space-y-3 flex-1 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-3 px-1">
+                  <span class="text-[11px] font-bold text-pink-400 uppercase tracking-wider flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-pink-500 animate-pulse"></span> Peer-to-Peer WebRTC
+                  </span>
+                  <span class="text-[10px] text-zinc-400 font-mono">Google STUN: 24ms</span>
+                </div>
+
+                <!-- Call Remote Stream Mockup -->
+                <div class="relative bg-zinc-900 rounded-2xl h-64 border border-brand-border overflow-hidden flex flex-col items-center justify-center p-4">
+                  <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-pink-500 to-purple-600 p-[2px] mb-3 shadow-lg shadow-pink-500/20">
+                    <img src="assets/icon.png" alt="Remote Peer" class="w-full h-full object-cover rounded-full" />
+                  </div>
+                  <h4 class="text-base font-extrabold text-white">Sana Iqbal</h4>
+                  <p class="text-xs text-pink-400 font-medium">1-on-1 Video Calling (02:18)</p>
+
+                  <!-- Waveform Simulation -->
+                  <div class="flex items-center gap-1 mt-4 h-6">
+                    <span class="w-1 h-3 bg-pink-500 rounded-full animate-bounce"></span>
+                    <span class="w-1 h-5 bg-purple-500 rounded-full animate-bounce [animation-delay:0.1s]"></span>
+                    <span class="w-1 h-6 bg-rose-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                    <span class="w-1 h-4 bg-pink-400 rounded-full animate-bounce [animation-delay:0.3s]"></span>
+                    <span class="w-1 h-2 bg-purple-400 rounded-full animate-bounce [animation-delay:0.15s]"></span>
+                  </div>
+
+                  <!-- Picture-in-Picture Local Preview -->
+                  <div class="absolute bottom-3 right-3 w-16 h-20 rounded-xl bg-zinc-800 border-2 border-pink-500 overflow-hidden shadow-lg flex items-center justify-center">
+                    <span class="text-[9px] font-bold text-zinc-400">You (Cam)</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Call Controls -->
+              <div class="flex items-center justify-around py-2 px-4 bg-brand-surface border border-brand-border rounded-2xl">
+                <button class="w-10 h-10 rounded-full bg-zinc-800 text-zinc-200 flex items-center justify-center">
+                  <i data-lucide="mic" class="w-4 h-4"></i>
+                </button>
+                <button class="w-10 h-10 rounded-full bg-zinc-800 text-zinc-200 flex items-center justify-center">
+                  <i data-lucide="camera-reverse" class="w-4 h-4"></i>
+                </button>
+                <button class="w-12 h-12 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg shadow-red-500/30">
+                  <i data-lucide="phone-off" class="w-5 h-5"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Screen View 2: Anonymous Confessions -->
+            <div id="screen-confessions" class="screen-view py-3 space-y-3 flex-1 hidden">
+              <div class="flex items-center justify-between mb-2 px-1">
+                <span class="text-xs font-extrabold text-white flex items-center gap-1.5">
+                  <i data-lucide="mask" class="w-4 h-4 text-purple-400"></i> Spill the Tea
+                </span>
+                <span class="text-[10px] text-zinc-400">Anonymous Mode</span>
+              </div>
+
+              <div class="bg-brand-surface border border-brand-border rounded-2xl p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs font-bold text-purple-400">🦊 Anonymous Fox</span>
+                  <span class="text-[10px] text-zinc-500">14m ago</span>
+                </div>
+                <p class="text-xs text-zinc-200 leading-relaxed font-normal">
+                  "Confession: I pretend to be an extrovert during campus meetups, but 10 minutes in I just want to sit on a quiet bench with chai and my headphones. Who else?"
+                </p>
+                <div class="flex items-center gap-5 mt-3 pt-2 border-t border-brand-border/60 text-[11px] text-zinc-400">
+                  <span class="flex items-center gap-1.5 text-pink-400 font-bold"><i data-lucide="heart" class="w-3.5 h-3.5 fill-pink-500"></i> 142</span>
+                  <span class="flex items-center gap-1.5"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i> 39 replies</span>
+                  <span class="flex items-center gap-1.5 text-zinc-500 ml-auto"><i data-lucide="shield" class="w-3.5 h-3.5"></i> Masked</span>
+                </div>
+              </div>
+
+              <div class="bg-brand-surface border border-brand-border rounded-2xl p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs font-bold text-pink-400">🦉 Night Owl</span>
+                  <span class="text-[10px] text-zinc-500">1h ago</span>
+                </div>
+                <p class="text-xs text-zinc-200 leading-relaxed font-normal">
+                  "I secretly sent a Secret Spark to someone in the Pune circle yesterday. Still waiting with my heart racing to see if it becomes mutual!"
+                </p>
+                <div class="flex items-center gap-5 mt-3 pt-2 border-t border-brand-border/60 text-[11px] text-zinc-400">
+                  <span class="flex items-center gap-1.5 text-pink-400 font-bold"><i data-lucide="heart" class="w-3.5 h-3.5 fill-pink-500"></i> 89</span>
+                  <span class="flex items-center gap-1.5"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i> 17 replies</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Screen View 3: Daily Hot Takes -->
+            <div id="screen-hottakes" class="screen-view py-3 space-y-3 flex-1 hidden">
+              <div class="flex items-center justify-between mb-2 px-1">
+                <span class="text-xs font-extrabold text-white flex items-center gap-1.5">
+                  <i data-lucide="flame" class="w-4 h-4 text-orange-400"></i> Daily Hot Take Battle
+                </span>
+                <span class="text-[10px] font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/20">🔥 7-Day Streak</span>
+              </div>
+
+              <div class="bg-brand-surface border border-orange-500/30 rounded-2xl p-4 shadow-sm">
+                <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Today's Provocation</span>
+                <h4 class="text-sm font-extrabold text-white mt-1 mb-3">
+                  "Working from home full-time kills your social intelligence. Agree or Disagree?"
+                </h4>
+
+                <!-- Voting Options Simulation -->
+                <div class="space-y-2">
+                  <div class="relative bg-zinc-900 border border-brand-border rounded-xl p-2.5 overflow-hidden">
+                    <div class="absolute inset-y-0 left-0 bg-pink-500/25 w-[68%] rounded-l-xl"></div>
+                    <div class="relative flex justify-between text-xs font-bold text-white px-1">
+                      <span>Totally Agree (68%)</span>
+                      <span class="text-pink-400">Selected ✓</span>
+                    </div>
+                  </div>
+
+                  <div class="relative bg-zinc-900 border border-brand-border rounded-xl p-2.5 overflow-hidden">
+                    <div class="absolute inset-y-0 left-0 bg-purple-500/25 w-[32%] rounded-l-xl"></div>
+                    <div class="relative flex justify-between text-xs font-bold text-zinc-300 px-1">
+                      <span>Disagree, depends on hobbies (32%)</span>
+                      <span class="text-zinc-500">214 votes</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p class="text-[10px] text-zinc-400 mt-3 text-center">
+                  671 members voted • Earned +1 streak point
+                </p>
+              </div>
+            </div>
+
+            <!-- Screen View 4: Instagram-Style Profile -->
+            <div id="screen-profile" class="screen-view py-3 space-y-3 flex-1 hidden">
+              <div class="flex items-center justify-between px-1 mb-2">
+                <span class="text-xs font-extrabold text-white flex items-center gap-1">
+                  @alex.travels <i data-lucide="badge-check" class="w-3.5 h-3.5 text-pink-400"></i>
+                </span>
+                <i data-lucide="settings" class="w-4 h-4 text-zinc-400"></i>
+              </div>
+
+              <!-- Profile Header Card -->
+              <div class="bg-brand-surface border border-brand-border rounded-2xl p-3.5 space-y-3">
+                <div class="flex items-center gap-4">
+                  <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-pink-500 to-purple-600 p-[2px]">
+                    <img src="assets/icon.png" alt="Profile" class="w-full h-full object-cover rounded-full" />
+                  </div>
+                  <div class="flex-1 flex justify-around text-center">
+                    <div>
+                      <p class="text-sm font-extrabold text-white">24</p>
+                      <p class="text-[10px] text-zinc-400 font-medium">Posts</p>
+                    </div>
+                    <div>
+                      <p class="text-sm font-extrabold text-white">189</p>
+                      <p class="text-[10px] text-zinc-400 font-medium">Followers</p>
+                    </div>
+                    <div>
+                      <p class="text-sm font-extrabold text-white">142</p>
+                      <p class="text-[10px] text-zinc-400 font-medium">Following</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h5 class="text-xs font-extrabold text-white">Alex Roy</h5>
+                  <p class="text-[11px] text-zinc-300 mt-0.5 leading-snug">
+                    Architectural designer in Mumbai. Exploring heritage alleys & finding indie coffee.
+                  </p>
+                </div>
+
+                <!-- 15s Voice Intro Player Strip -->
+                <div class="bg-zinc-900 border border-pink-500/30 rounded-xl p-2.5 flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 rounded-full bg-pink-500 text-white flex items-center justify-center text-[10px]">
+                      ▶
+                    </div>
+                    <span class="text-[11px] font-bold text-white">15s Voice Intro</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-pink-400">00:15 / 100% Verified</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bottom Navigation Bar -->
+            <div class="border-t border-brand-border/60 pt-3 flex justify-around text-zinc-400">
+              <i data-lucide="home" class="w-5 h-5 text-pink-400"></i>
+              <i data-lucide="users" class="w-5 h-5"></i>
+              <i data-lucide="plus-circle" class="w-5 h-5 text-purple-400"></i>
+              <i data-lucide="flame" class="w-5 h-5"></i>
+              <i data-lucide="user" class="w-5 h-5"></i>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- Engineering & Architecture Section ("Under the Hood") -->
+    <section id="architecture" class="py-16 px-4 sm:px-6 max-w-6xl mx-auto border-t border-brand-border/40">
+      <div class="text-center max-w-2xl mx-auto mb-12">
+        <span class="text-xs font-bold tracking-widest text-purple-400 uppercase">Under the Hood</span>
+        <h2 class="text-3xl font-extrabold text-white mt-1 mb-3">Modern Mobile Architecture</h2>
+        <p class="text-xs sm:text-sm text-zinc-400">
+          Built without bloated third-party black boxes. High-performance peer-to-peer real-time architecture engineered for scale.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Tech 1 -->
+        <div class="bg-brand-surface border border-brand-border rounded-2xl p-5">
+          <div class="w-8 h-8 rounded-lg bg-pink-500/10 text-pink-400 flex items-center justify-center mb-3">
+            <i data-lucide="cpu" class="w-4 h-4"></i>
+          </div>
+          <h4 class="text-sm font-bold text-white mb-1">React Native & Expo 58</h4>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Latest Expo SDK 58 runtime with React 19, Continuous Native Generation (CNG), and Expo Router.
+          </p>
+        </div>
+
+        <!-- Tech 2 -->
+        <div class="bg-brand-surface border border-brand-border rounded-2xl p-5">
+          <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center mb-3">
+            <i data-lucide="video" class="w-4 h-4"></i>
+          </div>
+          <h4 class="text-sm font-bold text-white mb-1">Raw WebRTC P2P</h4>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            <code class="text-pink-400">react-native-webrtc</code> with Google STUN servers and custom ProGuard R8 keep rules.
+          </p>
+        </div>
+
+        <!-- Tech 3 -->
+        <div class="bg-brand-surface border border-brand-border rounded-2xl p-5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-3">
+            <i data-lucide="radio" class="w-4 h-4"></i>
+          </div>
+          <h4 class="text-sm font-bold text-white mb-1">Supabase Realtime</h4>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Sub-100ms WebSocket broadcast signaling for instant ringing and synchronized peer negotiation.
+          </p>
+        </div>
+
+        <!-- Tech 4 -->
+        <div class="bg-brand-surface border border-brand-border rounded-2xl p-5">
+          <div class="w-8 h-8 rounded-lg bg-green-500/10 text-green-400 flex items-center justify-center mb-3">
+            <i data-lucide="shield-check" class="w-4 h-4"></i>
+          </div>
+          <h4 class="text-sm font-bold text-white mb-1">Row-Level Security (RLS)</h4>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Strict PostgreSQL security policies enforcing private anonymous aliases and secret spark matches.
+          </p>
+        </div>
+      </div>
+    </section>
+
     <!-- Key Features Section -->
-    <section id="features" class="py-20 px-4 sm:px-6 max-w-6xl mx-auto border-t border-brand-border/40">
-      <div class="text-center max-w-2xl mx-auto mb-16">
-        <span class="text-xs font-bold tracking-widest text-pink-400 uppercase">Engineered for real connection</span>
-        <h2 class="text-3xl sm:text-4xl font-extrabold text-white mt-2 mb-4 tracking-tight">
-          Everything You Need, Nothing You Don't
+    <section id="features" class="py-16 px-4 sm:px-6 max-w-6xl mx-auto border-t border-brand-border/40">
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <span class="text-xs font-bold tracking-widest text-pink-400 uppercase">Crafted for Community</span>
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-white mt-1 mb-3">
+          Designed for Meaningful Interaction
         </h2>
-        <p class="text-sm sm:text-base text-zinc-400">
-          Tired of ghost towns and endless swiping? Huddle is built around active, immediate human interaction.
+        <p class="text-sm text-zinc-400">
+          Tired of ghost towns and superficial swiping? Huddle puts authentic conversation front and center.
         </p>
       </div>
 
@@ -245,11 +547,11 @@
         <!-- Feature 1 -->
         <div class="bg-brand-surface border border-brand-border rounded-2xl p-6 hover:border-pink-500/40 transition group">
           <div class="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/20 text-pink-400 flex items-center justify-center mb-5 group-hover:scale-110 transition">
-            <i data-lucide="video" class="w-6 h-6"></i>
+            <i data-lucide="phone-call" class="w-6 h-6"></i>
           </div>
           <h3 class="text-lg font-bold text-white mb-2">1-on-1 Voice & Video Calling</h3>
           <p class="text-sm text-zinc-400 leading-relaxed">
-            Real-time peer-to-peer audio and video streaming powered by native WebRTC with Google STUN servers and instant ringing signaling.
+            High-fidelity peer-to-peer audio and video streaming powered by native WebRTC with Google STUN servers and instant ringing signaling.
           </p>
         </div>
 
@@ -260,7 +562,7 @@
           </div>
           <h3 class="text-lg font-bold text-white mb-2">Anonymous Confessions</h3>
           <p class="text-sm text-zinc-400 leading-relaxed">
-            Spill the tea with complete anonymity. Post community secrets, unfiltered thoughts, and honest opinions using randomly masked member aliases.
+            Spill the tea with complete anonymity. Post community secrets, honest opinions, and questions using randomized animal aliases.
           </p>
         </div>
 
@@ -271,7 +573,7 @@
           </div>
           <h3 class="text-lg font-bold text-white mb-2">Secret Sparks & Mutual Match</h3>
           <p class="text-sm text-zinc-400 leading-relaxed">
-            Send secret compliments to members you admire. If both members send a spark to each other, a Mutual Spark unlocks an instant direct chat!
+            Send secret compliments to members you admire. If feelings are mutual, a Mutual Spark unlocks an instant direct 1-on-1 chat!
           </p>
         </div>
 
@@ -282,7 +584,7 @@
           </div>
           <h3 class="text-lg font-bold text-white mb-2">Daily Hot Takes & Streaks</h3>
           <p class="text-sm text-zinc-400 leading-relaxed">
-            Vote on daily provocative questions, debate hot takes with the community, and build your daily streaks to earn exclusive profile badges.
+            Vote on daily provocative debates, see real-time voting percentages, and build daily active streaks to unlock exclusive achievement badges.
           </p>
         </div>
 
@@ -293,7 +595,7 @@
           </div>
           <h3 class="text-lg font-bold text-white mb-2">15-Sec Voice Intro & Gate</h3>
           <p class="text-sm text-zinc-400 leading-relaxed">
-            No catfish or empty bios. Mandatory onboarding gate ensures every member has a real photo, city, bio, and an authentic 15-second voice introduction.
+            Zero bots or empty profiles. Mandatory onboarding ensures real members with photo, city, bio, and an authentic 15-second voice introduction.
           </p>
         </div>
 
@@ -304,19 +606,19 @@
           </div>
           <h3 class="text-lg font-bold text-white mb-2">Instagram-Style Profile</h3>
           <p class="text-sm text-zinc-400 leading-relaxed">
-            Customizable <span class="text-pink-400 font-semibold">@username</span> handle, clickable followers and following lists, organized Posts, Saved, Badges, and About tabs.
+            Customizable <span class="text-pink-400 font-semibold">@username</span> handle, clickable followers and following lists, and organized Posts, Saved, Badges, and About tabs.
           </p>
         </div>
       </div>
     </section>
 
     <!-- Simple Installation Guide -->
-    <section id="install" class="py-20 px-4 sm:px-6 max-w-4xl mx-auto border-t border-brand-border/40">
-      <div class="text-center max-w-xl mx-auto mb-14">
+    <section id="install" class="py-16 px-4 sm:px-6 max-w-4xl mx-auto border-t border-brand-border/40">
+      <div class="text-center max-w-xl mx-auto mb-12">
         <span class="text-xs font-bold tracking-widest text-purple-400 uppercase">Fast 2-step setup</span>
-        <h2 class="text-3xl font-extrabold text-white mt-2 mb-3">Install Huddle on Android</h2>
+        <h2 class="text-3xl font-extrabold text-white mt-1 mb-2">Install Huddle on Android</h2>
         <p class="text-sm text-zinc-400">
-          Download directly to your Android device in seconds without waiting for Google Play.
+          Download directly to your Android device in seconds.
         </p>
       </div>
 
@@ -326,9 +628,9 @@
             1
           </div>
           <div>
-            <h4 class="text-base font-bold text-white mb-1">Download APK File</h4>
+            <h4 class="text-base font-bold text-white mb-1">Download APK</h4>
             <p class="text-xs text-zinc-400 leading-relaxed">
-              Tap the download button below from your mobile browser (Chrome/Samsung Internet). If prompted with "File might be harmful", tap <strong class="text-white">Download anyway</strong>.
+              Tap the download button below on your Android mobile browser. If Chrome displays "File might be harmful", tap <strong class="text-white">Download anyway</strong>.
             </p>
           </div>
         </div>
@@ -338,7 +640,7 @@
             2
           </div>
           <div>
-            <h4 class="text-base font-bold text-white mb-1">Install & Open</h4>
+            <h4 class="text-base font-bold text-white mb-1">Install & Connect</h4>
             <p class="text-xs text-zinc-400 leading-relaxed">
               Open your browser's Downloads or Notification bar, tap the downloaded <code class="text-pink-400 bg-black/40 px-1 py-0.5 rounded">.apk</code> file, and select <strong class="text-white">Install</strong>. Launch Huddle and create your profile!
             </p>
@@ -354,14 +656,14 @@
           class="inline-flex items-center gap-3 px-8 py-4 rounded-2xl text-base font-extrabold text-white bg-gradient-to-r from-pink-500 to-purple-600 shadow-xl shadow-pink-500/25 hover:shadow-pink-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
           <i data-lucide="download" class="w-5 h-5"></i>
-          <span>Download Huddle APK (v1.2)</span>
+          <span>Download Huddle APK (Direct)</span>
         </a>
       </div>
     </section>
   </main>
 
   <!-- Footer -->
-  <footer class="border-t border-brand-border/60 py-12 px-4 sm:px-6 relative z-10 glass">
+  <footer class="border-t border-brand-border/70 py-12 px-4 sm:px-6 relative z-10 glass">
     <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
       <div class="flex items-center gap-3">
         <div class="w-8 h-8 rounded-lg overflow-hidden bg-gradient-to-tr from-pink-500 to-purple-600 p-[1.5px]">
@@ -369,7 +671,7 @@
         </div>
         <div>
           <span class="text-base font-extrabold text-white">Huddle</span>
-          <span class="text-xs text-zinc-400 block">Your people, your place.</span>
+          <span class="text-xs text-zinc-400 block"><a href="https://joinhuddle.me" class="text-pink-400 hover:underline">joinhuddle.me</a> • Your people, your place.</span>
         </div>
       </div>
 
@@ -397,7 +699,33 @@
   <script>
     // Initialize Lucide Icons
     lucide.createIcons();
+
+    // Tab Switcher for Phone Mockup
+    function switchScreen(screenId) {
+      // Hide all screen views
+      const screens = ['call', 'confessions', 'hottakes', 'profile'];
+      screens.forEach(s => {
+        const el = document.getElementById('screen-' + s);
+        if (el) el.classList.add('hidden');
+        const tab = document.getElementById('tab-' + s);
+        if (tab) {
+          tab.classList.remove('tab-active');
+          tab.classList.remove('bg-pink-500/15');
+          tab.classList.add('bg-brand-surface');
+          tab.classList.add('text-zinc-400');
+        }
+      });
+
+      // Show selected screen view
+      const targetScreen = document.getElementById('screen-' + screenId);
+      if (targetScreen) targetScreen.classList.remove('hidden');
+
+      const targetTab = document.getElementById('tab-' + screenId);
+      if (targetTab) {
+        targetTab.classList.add('tab-active');
+        targetTab.classList.remove('text-zinc-400');
+      }
+    }
   </script>
 </body>
 </html>
-
