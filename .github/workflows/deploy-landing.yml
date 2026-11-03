@@ -7,6 +7,8 @@ on:
     paths:
       - "landing-page/**"
       - ".github/workflows/deploy-landing.yml"
+      - "CNAME"
+      - "index.html"
   workflow_dispatch:
 
 permissions:
@@ -30,6 +32,14 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
+
+      - name: Prepare Landing Page & CNAME
+        run: |
+          # Ensure CNAME exists in the deployment root
+          echo "joinhuddle.me" > ./landing-page/CNAME
+          # Support both root domain (joinhuddle.me) and repository subfolder (/Huddle/)
+          mkdir -p ./landing-page/Huddle
+          cp -r ./landing-page/index.html ./landing-page/assets ./landing-page/Huddle/
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3

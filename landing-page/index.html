@@ -21,7 +21,14 @@
   <meta name="twitter:description" content="Real-time WebRTC calling, anonymous confessions, and authentic community." />
   <meta name="twitter:image" content="https://joinhuddle.me/assets/logo.png" />
 
-  <link rel="icon" type="image/png" href="assets/icon.png" />
+  <link rel="icon" type="image/png" href="./assets/icon.png" />
+
+  <!-- Subfolder & Trailing Slash Normalization -->
+  <script>
+    if (window.location.pathname === '/Huddle') {
+      window.location.replace('/Huddle/');
+    }
+  </script>
 
   <!-- Google Fonts & Tailwind CSS CDN -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -120,7 +127,7 @@
     <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
       <a href="https://joinhuddle.me" class="flex items-center gap-3 group">
         <div class="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-tr from-pink-500 to-purple-600 p-[2px] transition group-hover:scale-105 shadow-md shadow-pink-500/20">
-          <img src="assets/logo.png" alt="Huddle Logo" class="w-full h-full object-cover rounded-[10px] bg-black" />
+          <img src="./assets/logo.png" alt="Huddle Logo" class="w-full h-full object-cover rounded-[10px] bg-black" />
         </div>
         <div class="flex flex-col">
           <span class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
@@ -296,7 +303,7 @@
                 <!-- Call Remote Stream Mockup -->
                 <div class="relative bg-zinc-900 rounded-2xl h-64 border border-brand-border overflow-hidden flex flex-col items-center justify-center p-4">
                   <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-pink-500 to-purple-600 p-[2px] mb-3 shadow-lg shadow-pink-500/20">
-                    <img src="assets/icon.png" alt="Remote Peer" class="w-full h-full object-cover rounded-full" />
+                    <img src="./assets/icon.png" alt="Remote Peer" class="w-full h-full object-cover rounded-full" />
                   </div>
                   <h4 class="text-base font-extrabold text-white">Sana Iqbal</h4>
                   <p class="text-xs text-pink-400 font-medium">1-on-1 Video Calling (02:18)</p>
@@ -423,7 +430,7 @@
               <div class="bg-brand-surface border border-brand-border rounded-2xl p-3.5 space-y-3">
                 <div class="flex items-center gap-4">
                   <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-pink-500 to-purple-600 p-[2px]">
-                    <img src="assets/icon.png" alt="Profile" class="w-full h-full object-cover rounded-full" />
+                    <img src="./assets/icon.png" alt="Profile" class="w-full h-full object-cover rounded-full" />
                   </div>
                   <div class="flex-1 flex justify-around text-center">
                     <div>
@@ -667,7 +674,7 @@
     <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
       <div class="flex items-center gap-3">
         <div class="w-8 h-8 rounded-lg overflow-hidden bg-gradient-to-tr from-pink-500 to-purple-600 p-[1.5px]">
-          <img src="assets/logo.png" alt="Huddle" class="w-full h-full object-cover rounded-[7px] bg-black" />
+          <img src="./assets/logo.png" alt="Huddle" class="w-full h-full object-cover rounded-[7px] bg-black" />
         </div>
         <div>
           <span class="text-base font-extrabold text-white">Huddle</span>
