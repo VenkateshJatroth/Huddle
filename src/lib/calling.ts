@@ -254,7 +254,14 @@ export function subscribeToIncomingCalls(
       config: { broadcast: { self: true } },
     })
     .on("broadcast", { event: "call-invitation" }, ({ payload }) => {
-      if (payload && payload.receiverId === userId) {
+      // Validate recipient and ensure caller is not spoofed / self
+      if (
+        payload &&
+        payload.receiverId === userId &&
+        payload.callerId &&
+        payload.callerId !== userId &&
+        typeof payload.callId === "string"
+      ) {
         notifyOnce({
           id: payload.callId,
           caller_id: payload.callerId,
@@ -275,7 +282,14 @@ export function subscribeToIncomingCalls(
   // 2. Global huddle-calls channel listener
   const broadcastChan = getBroadcastChannel();
   broadcastChan.on("broadcast", { event: "call-invitation" }, ({ payload }) => {
-    if (payload && payload.receiverId === userId) {
+    // Validate recipient and valid sender
+    if (
+      payload &&
+      payload.receiverId === userId &&
+      payload.callerId &&
+      payload.callerId !== userId &&
+      typeof payload.callId === "string"
+    ) {
       notifyOnce({
         id: payload.callId,
         caller_id: payload.callerId,
@@ -294,7 +308,7 @@ export function subscribeToIncomingCalls(
 
   // Also listen for status changes so ringing banner dismisses if caller hangs up
   broadcastChan.on("broadcast", { event: "call-status" }, ({ payload }) => {
-    if (payload && (payload.status === "ended" || payload.status === "declined")) {
+    if (payload && typeof payload.callId === "string" && (payload.status === "ended" || payload.status === "declined")) {
       onDismiss?.(payload.callId);
     }
   });

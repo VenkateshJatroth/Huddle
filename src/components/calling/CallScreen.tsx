@@ -22,6 +22,7 @@ import {
   type CallStatus,
   type CallType,
 } from "../../lib/calling";
+import { dismissIncomingCallNotification } from "../../lib/notifications";
 import { supabase } from "../../lib/supabase";
 import {
   configureAudioSessionForCall,
@@ -109,6 +110,9 @@ export function CallScreen({
   const handleEndCall = useCallback(() => {
     if (isEndingRef.current) return;
     isEndingRef.current = true;
+
+    // Dismiss any active call notification
+    void dismissIncomingCallNotification();
 
     // Reset audio session mode to standard playback
     void resetAudioSession();
@@ -438,10 +442,14 @@ export function CallScreen({
       }
     };
 
+    const isAuthorizedSender = (senderId?: string) => {
+      return Boolean(senderId && senderId === memberId);
+    };
+
     signalingChannel
       // Receiver notifies Caller that peer is ready to receive offer
       .on("broadcast", { event: "peer-ready" }, async ({ payload }) => {
-        if (!isMounted || payload.senderId === currentUserId) return;
+        if (!isMounted || !isAuthorizedSender(payload?.senderId)) return;
         if (!isIncoming) {
           if (callerReadyInterval) {
             clearInterval(callerReadyInterval);
@@ -452,7 +460,7 @@ export function CallScreen({
       })
       // Caller notifies room that caller is online waiting for receiver
       .on("broadcast", { event: "caller-ready" }, async ({ payload }) => {
-        if (!isMounted || payload.senderId === currentUserId) return;
+        if (!isMounted || !isAuthorizedSender(payload?.senderId)) return;
         if (isIncoming) {
           // Immediately notify caller that receiver is ready
           void signalingChannel.send({
@@ -463,7 +471,7 @@ export function CallScreen({
         }
       })
       .on("broadcast", { event: "sdp-offer" }, async ({ payload }) => {
-        if (!isMounted || !pc || payload.senderId === currentUserId) return;
+        if (!isMounted || !pc || !isAuthorizedSender(payload?.senderId)) return;
         try {
           // Ensure local audio/video tracks are bound to pc before generating SDP answer
           await ensureLocalTracks();
@@ -496,7 +504,7 @@ export function CallScreen({
         }
       })
       .on("broadcast", { event: "sdp-answer" }, async ({ payload }) => {
-        if (!isMounted || !pc || payload.senderId === currentUserId) return;
+        if (!isMounted || !pc || !isAuthorizedSender(payload?.senderId)) return;
         try {
           if (pc.signalingState !== "closed") {
             await pc.setRemoteDescription(new RTCSessionDescription({ type: payload.type, sdp: payload.sdp }));
@@ -515,7 +523,7 @@ export function CallScreen({
         }
       })
       .on("broadcast", { event: "ice-candidate" }, async ({ payload }) => {
-        if (!isMounted || !pc || payload.senderId === currentUserId) return;
+        if (!isMounted || !pc || !isAuthorizedSender(payload?.senderId)) return;
         try {
           if (pc.remoteDescription && pc.remoteDescription.type) {
             await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
@@ -528,7 +536,7 @@ export function CallScreen({
         }
       })
       .on("broadcast", { event: "call-ended" }, ({ payload }) => {
-        if (!isMounted || payload.senderId === currentUserId) return;
+        if (!isMounted || !isAuthorizedSender(payload?.senderId)) return;
         handleEndCall();
       });
 
@@ -574,6 +582,7 @@ export function CallScreen({
 
     return () => {
       isMounted = false;
+      void dismissIncomingCallNotification();
       if (callerReadyInterval) {
         clearInterval(callerReadyInterval);
       }
@@ -599,7 +608,7 @@ export function CallScreen({
         // Safe guard
       }
     };
-  }, [callType, currentUserId, handleEndCall, isIncoming, resolvedCallId]);
+  }, [callType, currentUserId, handleEndCall, isIncoming, memberId, resolvedCallId]);
 
   // Subscribe to call session updates in Supabase database
   useEffect(() => {

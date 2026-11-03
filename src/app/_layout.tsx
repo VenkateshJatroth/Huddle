@@ -14,6 +14,8 @@ import {
 } from "../lib/profileCompletion";
 import {
   checkAndTriggerEngagementReminder,
+  dismissIncomingCallNotification,
+  presentIncomingCallNotification,
   registerForPushNotificationsAsync,
   useNotificationObserver,
 } from "../lib/notifications";
@@ -52,9 +54,16 @@ function RootNavigator() {
       user.id,
       (call) => {
         setIncomingCall(call);
+        void presentIncomingCallNotification({
+          callId: call.id,
+          callerId: call.caller_id,
+          callerName: call.caller_name || "Huddle Member",
+          callType: call.call_type,
+        });
       },
       (dismissedCallId) => {
         setIncomingCall((curr) => (curr?.id === dismissedCallId ? null : curr));
+        void dismissIncomingCallNotification();
       },
     );
     return () => {
@@ -85,6 +94,7 @@ function RootNavigator() {
     if (!incomingCall) return;
     const callToAnswer = incomingCall;
     setIncomingCall(null);
+    void dismissIncomingCallNotification();
     router.push({
       pathname: "/call/[id]",
       params: {
@@ -100,6 +110,7 @@ function RootNavigator() {
 
   const handleDeclineCall = () => {
     if (!incomingCall) return;
+    void dismissIncomingCallNotification();
     void updateCallStatus(incomingCall.id, "declined");
     setIncomingCall(null);
   };

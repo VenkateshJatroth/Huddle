@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
-import { AndroidImportance } from "expo-notifications";
+import { AndroidImportance, AndroidNotificationVisibility } from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
 import { router } from "expo-router";
@@ -190,6 +190,107 @@ export function subscribeToNotifications(
 // 2. Push Notifications & Observers
 // =============================================================================
 
+export const INCOMING_CALL_CHANNEL_ID = "incoming-calls";
+export const INCOMING_CALL_CATEGORY_ID = "incoming-call-category";
+
+export async function setupCallNotificationChannel(): Promise<void> {
+  if (Platform.OS === "android") {
+    try {
+      await Notifications.setNotificationChannelAsync(INCOMING_CALL_CHANNEL_ID, {
+        name: "Incoming Calls",
+        description: "Ringtone and high-priority alerts for incoming voice and video calls.",
+        importance: AndroidImportance.MAX,
+        vibrationPattern: [0, 500, 500, 500],
+        lightColor: "#ec4899",
+        lockscreenVisibility: AndroidNotificationVisibility.PUBLIC,
+        sound: "default",
+        bypassDnd: true,
+      });
+    } catch {
+      // Channel setup guard
+    }
+  }
+
+  try {
+    await Notifications.setNotificationCategoryAsync(INCOMING_CALL_CATEGORY_ID, [
+      {
+        identifier: "ANSWER_CALL",
+        buttonTitle: "Answer",
+        options: {
+          opensAppToForeground: true,
+        },
+      },
+      {
+        identifier: "DECLINE_CALL",
+        buttonTitle: "Decline",
+        options: {
+          isDestructive: true,
+          opensAppToForeground: false,
+        },
+      },
+    ]);
+  } catch {
+    // Category setup guard
+  }
+}
+
+/**
+ * Triggers an immediate high-priority incoming call notification on the device.
+ */
+export async function presentIncomingCallNotification(params: {
+  callId: string;
+  callerId: string;
+  callerName: string;
+  callType: "voice" | "video";
+}): Promise<string | null> {
+  if (Platform.OS === "web") return null;
+
+  try {
+    await setupCallNotificationChannel();
+
+    const notifId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `📞 Incoming ${params.callType === "video" ? "Video" : "Voice"} Call`,
+        body: `${params.callerName} is calling you on Huddle...`,
+        sound: "default",
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        categoryIdentifier: INCOMING_CALL_CATEGORY_ID,
+        data: {
+          type: "incoming_call",
+          callId: params.callId,
+          callerId: params.callerId,
+          callType: params.callType,
+          callerName: params.callerName,
+        },
+      },
+      trigger: {
+        channelId: INCOMING_CALL_CHANNEL_ID,
+      },
+    });
+
+    return notifId;
+  } catch (err) {
+    console.warn("presentIncomingCallNotification error:", err);
+    return null;
+  }
+}
+
+/**
+ * Dismisses an active incoming call notification.
+ */
+export async function dismissIncomingCallNotification(notificationId?: string | null): Promise<void> {
+  if (Platform.OS === "web") return;
+  try {
+    if (notificationId) {
+      await Notifications.dismissNotificationAsync(notificationId);
+    } else {
+      await Notifications.dismissAllNotificationsAsync();
+    }
+  } catch {
+    // Non-blocking
+  }
+}
+
 // Configure how notifications appear when the app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -220,6 +321,9 @@ export async function registerForPushNotificationsAsync(userId: string): Promise
   if (!Device.isDevice) {
     return null;
   }
+
+  // Setup both general and high-importance call channels
+  await setupCallNotificationChannel();
 
   if (Platform.OS === "android") {
     try {
@@ -275,9 +379,37 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
     url?: string;
     chatId?: string;
     memberId?: string;
+    type?: string;
+    callId?: string;
+    callerId?: string;
+    callType?: "voice" | "video";
+    callerName?: string;
   } | undefined;
 
   if (!data) return;
+
+  if (data.type === "incoming_call" && data.callId && data.callerId) {
+    if (response.actionIdentifier === "DECLINE_CALL") {
+      void Notifications.dismissNotificationAsync(response.notification.request.identifier);
+      void (supabase as any)
+        .from("call_sessions")
+        .update({ status: "declined", ended_at: new Date().toISOString() })
+        .eq("id", data.callId);
+      return;
+    }
+
+    void Notifications.dismissNotificationAsync(response.notification.request.identifier);
+    router.push({
+      pathname: "/call/[id]",
+      params: {
+        id: data.callerId,
+        callId: data.callId,
+        type: data.callType || "voice",
+        isIncoming: "true",
+      },
+    } as never);
+    return;
+  }
 
   if (data.url) {
     router.push(data.url as never);

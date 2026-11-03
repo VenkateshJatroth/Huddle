@@ -13,7 +13,13 @@
       "bundleIdentifier": "com.venkateshjatroth.huddle",
       "infoPlist": {
         "NSCameraUsageDescription": "Huddle needs camera access for video calls.",
-        "NSMicrophoneUsageDescription": "Huddle needs microphone access for voice and video calls."
+        "NSMicrophoneUsageDescription": "Huddle needs microphone access for voice and video calls.",
+        "UIBackgroundModes": [
+          "audio",
+          "voip",
+          "fetch",
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -36,7 +42,10 @@
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.FOREGROUND_SERVICE_PHONE_CALL",
+        "android.permission.WAKE_LOCK"
       ]
     },
     "web": {
