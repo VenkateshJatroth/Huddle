@@ -140,7 +140,7 @@ function RootNavigator() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar style={colors.background === "#000000" ? "light" : "dark"} />
+      <StatusBar style={colors.background === "#121212" ? "light" : "dark"} />
       <UpdateNotificationBanner />
 
       {/* Full-Screen VoIP Incoming Call Screen with Ringtone & Pulsing Ring */}

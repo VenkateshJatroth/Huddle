@@ -181,8 +181,10 @@ export function getProfileCompletion(
     });
   }
 
-  // All 5 core fields are mandatory
-  const isCoreComplete = hasDisplayName && hasAvatar && hasBio && hasLocation && hasInterests;
+  // All enrichment fields contribute to 100% completion, but ONLY Display Name and Username are mandatory for instant entry (<10s)
+  const username = profile?.username?.trim();
+  const hasUsername = Boolean(username && username.length >= 2 && !username.startsWith("user_temp"));
+  const isCoreComplete = hasDisplayName && hasUsername;
   const clampedPercentage = Math.min(100, completionPercentage);
   const isFullyComplete = clampedPercentage >= 100;
 

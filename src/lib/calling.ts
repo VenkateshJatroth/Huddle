@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { sendHighPriorityCallPush } from "./notifications";
 
 export type CallType = "voice" | "video";
 export type CallStatus = "ringing" | "connected" | "ended" | "declined" | "missed";
@@ -128,6 +129,18 @@ export async function startCall(
     });
   } catch {
     // Non-blocking notification guard
+  }
+
+  // 4. Send immediate high-priority push notification to wake up device
+  try {
+    void sendHighPriorityCallPush(receiverId, {
+      callId: session.id,
+      callerId,
+      callerName: callerName || "Huddle Member",
+      callType,
+    });
+  } catch {
+    // Non-blocking push guard
   }
 
   return session;

@@ -179,23 +179,32 @@ export default function OnboardingProfileScreen() {
     if (!user) return;
     setErrorMessage(null);
 
-    if (!completion.isCoreComplete) {
+    const cleanDisplay = displayName.trim();
+    if (!cleanDisplay || cleanDisplay.length < 2) {
       Alert.alert(
-        "Complete Required Details",
-        `Please address the following before continuing:\n• ${completion.missingFields.slice(0, 3).join("\n• ")}`,
+        "Display Name Required",
+        "Please enter your display name (at least 2 characters) to continue.",
+      );
+      return;
+    }
+
+    const finalUsername =
+      username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "") ||
+      `member_${user.id.slice(0, 8)}`;
+
+    if (!finalUsername || finalUsername.length < 2) {
+      Alert.alert(
+        "Username Required",
+        "Please choose a valid username (at least 2 characters) to continue.",
       );
       return;
     }
 
     setIsSaving(true);
     try {
-      const finalUsername =
-        username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "") ||
-        `member_${user.id.slice(0, 8)}`;
-
       const draftToSave: Partial<GormatiProfileDraft> & { avatar_url?: string | null } = {
-        full_name: displayName.trim(),
-        display_name: displayName.trim(),
+        full_name: cleanDisplay,
+        display_name: cleanDisplay,
         username: finalUsername,
         bio: bio.trim(),
         location: location.trim(),
@@ -261,9 +270,9 @@ export default function OnboardingProfileScreen() {
               contentFit="cover"
             />
             <View>
-              <Text style={[styles.brandTitle, { color: colors.text }]}>Huddle</Text>
+              <Text style={[styles.brandTitle, { color: colors.text }]}>Welcome to Huddle 👋</Text>
               <Text style={[styles.brandSubtitle, { color: colors.secondary }]}>
-                Mandatory Profile Setup
+                Quick setup (under 10 seconds)
               </Text>
             </View>
           </View>
@@ -290,17 +299,64 @@ export default function OnboardingProfileScreen() {
             </View>
             <Text style={[styles.progressHelp, { color: colors.secondary }]}>
               {completion.isCoreComplete
-                ? "✓ Core requirements satisfied! You are ready to enter."
-                : `Complete all mandatory fields to unlock community access (${completion.missingFields.length} remaining)`}
+                ? "✓ Ready to enter! You can enrich other details anytime."
+                : "Enter your display name & username below to jump straight into Huddle."}
             </Text>
           </Card>
         </View>
 
-        {/* 1. Photo Section */}
+        {/* 1. Identity Section (Mandatory: Name & Username) */}
         <Card style={styles.formCard}>
-          <Text style={[styles.fieldSectionTitle, { color: colors.text }]}>1. Profile Photo</Text>
+          <Text style={[styles.fieldSectionTitle, { color: colors.text }]}>1. Identity (Required)</Text>
+
+          {/* Display Name */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>
+              Display Name <Text style={{ color: "#EF4444" }}>*</Text>
+            </Text>
+            <TextInput
+              style={[
+                styles.textInput,
+                { backgroundColor: colors.subtle, borderColor: colors.border, color: colors.text },
+              ]}
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder="e.g. Alex Rivera"
+              placeholderTextColor={colors.secondary}
+              maxLength={50}
+            />
+          </View>
+
+          {/* Handle */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>
+              Username / Handle <Text style={{ color: "#EF4444" }}>*</Text>
+            </Text>
+            <View style={styles.handleInputWrap}>
+              <Text style={[styles.handlePrefix, { color: colors.secondary }]}>@</Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  styles.handleInput,
+                  { backgroundColor: colors.subtle, borderColor: colors.border, color: colors.text },
+                ]}
+                value={username}
+                onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9_.]/g, ""))}
+                placeholder="alex.rivera"
+                placeholderTextColor={colors.secondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={30}
+              />
+            </View>
+          </View>
+        </Card>
+
+        {/* 2. Photo Section (Optional) */}
+        <Card style={styles.formCard}>
+          <Text style={[styles.fieldSectionTitle, { color: colors.text }]}>2. Profile Photo (Optional)</Text>
           <Text style={[styles.fieldHelp, { color: colors.secondary }]}>
-            Members with a photo receive 5x more circle connections.
+            Upload a photo or avatar. You can change this anytime.
           </Text>
 
           <View style={styles.photoRow}>
@@ -342,61 +398,19 @@ export default function OnboardingProfileScreen() {
                   { color: avatarUrl || localAvatarUri ? "#10B981" : colors.secondary },
                 ]}
               >
-                {avatarUrl || localAvatarUri ? "✓ Photo added" : "• Photo required"}
+                {avatarUrl || localAvatarUri ? "✓ Photo added" : "• Optional"}
               </Text>
             </View>
           </View>
         </Card>
 
-        {/* 2. Identity Section */}
+        {/* 3. Location & Intention (Optional) */}
         <Card style={styles.formCard}>
-          <Text style={[styles.fieldSectionTitle, { color: colors.text }]}>2. Identity & Location</Text>
-
-          {/* Display Name */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>
-              Display Name <Text style={{ color: colors.accent }}>*</Text>
-            </Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                { backgroundColor: colors.subtle, borderColor: colors.border, color: colors.text },
-              ]}
-              value={displayName}
-              onChangeText={setDisplayName}
-              placeholder="e.g. Venky Jatroth"
-              placeholderTextColor={colors.secondary}
-              maxLength={50}
-            />
-          </View>
-
-          {/* Handle */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Username / Handle</Text>
-            <View style={styles.handleInputWrap}>
-              <Text style={[styles.handlePrefix, { color: colors.secondary }]}>@</Text>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  styles.handleInput,
-                  { backgroundColor: colors.subtle, borderColor: colors.border, color: colors.text },
-                ]}
-                value={username}
-                onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9_.]/g, ""))}
-                placeholder="venky.jatroth"
-                placeholderTextColor={colors.secondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                maxLength={30}
-              />
-            </View>
-          </View>
+          <Text style={[styles.fieldSectionTitle, { color: colors.text }]}>3. Community Preferences (Optional)</Text>
 
           {/* Location */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>
-              City / Location <Text style={{ color: colors.accent }}>*</Text>
-            </Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>City / Location</Text>
             <TextInput
               style={[
                 styles.textInput,
@@ -404,7 +418,7 @@ export default function OnboardingProfileScreen() {
               ]}
               value={location}
               onChangeText={setLocation}
-              placeholder="e.g. Dubai, UAE or Hyderabad, India"
+              placeholder="e.g. Dubai, UAE or San Francisco, CA"
               placeholderTextColor={colors.secondary}
               maxLength={80}
             />
@@ -426,11 +440,11 @@ export default function OnboardingProfileScreen() {
           </View>
         </Card>
 
-        {/* 3. Bio Section */}
+        {/* 3. Bio Section (Optional) */}
         <Card style={styles.formCard}>
           <View style={styles.fieldHeaderRow}>
             <Text style={[styles.fieldSectionTitle, { color: colors.text }]}>
-              3. About You (Bio) <Text style={{ color: colors.accent }}>*</Text>
+              3. About You (Optional)
             </Text>
             <Text
               style={[
@@ -461,11 +475,11 @@ export default function OnboardingProfileScreen() {
           />
         </Card>
 
-        {/* 4. Interests Section */}
+        {/* 4. Interests Section (Optional) */}
         <Card style={styles.formCard}>
           <View style={styles.fieldHeaderRow}>
             <Text style={[styles.fieldSectionTitle, { color: colors.text }]}>
-              4. Interests <Text style={{ color: colors.accent }}>*</Text>
+              4. Interests (Optional)
             </Text>
             <View
               style={[
@@ -518,8 +532,8 @@ export default function OnboardingProfileScreen() {
         {/* Submit Action */}
         <View style={styles.actionContainer}>
           <AppButton
-            label={isSaving ? "Saving Profile…" : "Save Profile & Enter Huddle"}
-            disabled={!completion.isCoreComplete || isSaving || isUploadingPhoto}
+            label={isSaving ? "Entering Huddle…" : "Enter Huddle →"}
+            disabled={!displayName.trim() || !username.trim() || isSaving || isUploadingPhoto}
             onPress={() => {
               void handleSaveAndContinue();
             }}

@@ -44,25 +44,37 @@ export function getIceServers(): RTCIceServerConfig[] {
   }
 
   // Tier 3: High-availability OpenRelay / Metered TURN fallback configuration
-  // Supports UDP, TCP (Port 80 to bypass HTTP firewalls), and TURNS/TLS (Port 443 to bypass DPI firewalls)
+  // Supports UDP, TCP (Port 80/3478 to bypass HTTP firewalls), and TURNS/TLS (Port 443/5349 to bypass DPI firewalls)
   servers.push(
     {
-      urls: "turn:openrelay.metered.ca:80",
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:3478",
+      ],
       username: "openrelayproject",
       credential: "openrelayproject",
     },
     {
-      urls: "turn:openrelay.metered.ca:80?transport=tcp",
+      urls: [
+        "turn:openrelay.metered.ca:80?transport=tcp",
+        "turn:openrelay.metered.ca:3478?transport=tcp",
+      ],
       username: "openrelayproject",
       credential: "openrelayproject",
     },
     {
-      urls: "turn:openrelay.metered.ca:443",
+      urls: [
+        "turn:openrelay.metered.ca:443",
+        "turns:openrelay.metered.ca:5349",
+      ],
       username: "openrelayproject",
       credential: "openrelayproject",
     },
     {
-      urls: "turns:openrelay.metered.ca:443?transport=tcp",
+      urls: [
+        "turns:openrelay.metered.ca:443?transport=tcp",
+        "turns:openrelay.metered.ca:5349?transport=tcp",
+      ],
       username: "openrelayproject",
       credential: "openrelayproject",
     },

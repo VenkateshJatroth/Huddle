@@ -276,6 +276,64 @@ export async function presentIncomingCallNotification(params: {
 }
 
 /**
+ * Sends a high-priority Expo push notification to wake up the receiver device for incoming VoIP calls.
+ */
+export async function sendHighPriorityCallPush(
+  receiverId: string,
+  params: {
+    callId: string;
+    callerId: string;
+    callerName: string;
+    callType: "voice" | "video";
+  },
+): Promise<boolean> {
+  try {
+    const { data: profile } = await (supabase as any)
+      .from("profiles")
+      .select("push_token")
+      .eq("id", receiverId)
+      .maybeSingle();
+
+    const pushToken = profile?.push_token;
+    if (!pushToken || typeof pushToken !== "string" || !pushToken.startsWith("ExponentPushToken[")) {
+      return false;
+    }
+
+    const payload = {
+      to: pushToken,
+      title: `📞 Incoming ${params.callType === "video" ? "Video" : "Voice"} Call`,
+      body: `${params.callerName} is calling you on Huddle...`,
+      sound: "default",
+      priority: "high",
+      channelId: INCOMING_CALL_CHANNEL_ID,
+      categoryId: INCOMING_CALL_CATEGORY_ID,
+      data: {
+        type: "incoming_call",
+        callId: params.callId,
+        callerId: params.callerId,
+        callerName: params.callerName,
+        callType: params.callType,
+      },
+    };
+
+    const res = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Accept-encoding": "gzip, deflate",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    return res.ok;
+  } catch (err) {
+    console.warn("sendHighPriorityCallPush failed:", err);
+    return false;
+  }
+}
+
+/**
  * Dismisses an active incoming call notification.
  */
 export async function dismissIncomingCallNotification(notificationId?: string | null): Promise<void> {

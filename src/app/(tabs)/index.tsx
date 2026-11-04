@@ -303,22 +303,24 @@ export default function HomeScreen() {
           <Text style={[styles.brandName, { color: colors.text }]}>Huddle</Text>
           <Text style={[styles.brandSubtitle, { color: colors.secondary }]}>{"Let's connect"}</Text>
         </View>
-        <IconButton
-          name="bell"
-          label="Notifications"
-          badge={unreadCount > 0 ? String(unreadCount) : undefined}
-          onPress={() => router.push("/notifications" as never)}
-        />
-        <IconButton
-          name="search"
-          label="Search & Discover"
-          onPress={() => router.push("/discover" as never)}
-        />
-        <IconButton
-          name="settings"
-          label="App settings"
-          onPress={() => router.push("/settings" as never)}
-        />
+        <View style={styles.headerRightActions}>
+          <IconButton
+            name="bell"
+            label="Notifications"
+            badge={unreadCount > 0 ? String(unreadCount) : undefined}
+            onPress={() => router.push("/notifications" as never)}
+          />
+          <IconButton
+            name="chat"
+            label="Messages"
+            onPress={() => router.push("/(tabs)/chat" as never)}
+          />
+          <IconButton
+            name="search"
+            label="Search & Discover"
+            onPress={() => router.push("/discover" as never)}
+          />
+        </View>
       </View>
 
       <View style={styles.welcomeBlock}>
@@ -575,8 +577,9 @@ const styles = StyleSheet.create({
   brandLogo: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#000000" },
   brandMark: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   brandText: { flex: 1, gap: 2 },
-  brandName: { fontSize: 20, fontWeight: "800", letterSpacing: -0.4 },
-  brandSubtitle: { fontSize: 12 },
+  brandName: { fontSize: 24, fontWeight: "800", letterSpacing: -0.6 },
+  brandSubtitle: { fontSize: 12, fontWeight: "500" },
+  headerRightActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   welcomeBlock: { gap: 5, marginTop: 2 },
   welcomeTitle: { fontSize: 23, lineHeight: 29, fontWeight: "700", letterSpacing: -0.5 },
   welcomeText: { fontSize: 14, lineHeight: 20 },

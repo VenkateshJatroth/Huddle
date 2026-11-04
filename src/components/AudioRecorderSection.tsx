@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAppColors } from "../theme/colors";
-import { formatAudioDuration, requestMicrophonePermission } from "../lib/audio";
+import { formatAudioDuration } from "../lib/audio";
+import {
+  cancelVoiceRecording,
+  startVoiceRecording,
+  stopVoiceRecording,
+} from "../lib/voiceNotes";
 import { Icon } from "./Icon";
 import { AudioPlayerCard } from "./AudioPlayerCard";
 
@@ -22,20 +27,26 @@ export function AudioRecorderSection({
   const timerRef = useRef<any>(null);
   const secondsRef = useRef(0);
 
-  const handleStopRecording = useCallback(() => {
+  const handleStopRecording = useCallback(async () => {
     setIsRecording(false);
     if (timerRef.current) clearInterval(timerRef.current);
-    const finalDuration = Math.max(3, secondsRef.current);
-    const mockAudioUri = `huddle-audio://${Date.now()}.m4a`;
-    onAudioRecorded(mockAudioUri, finalDuration);
+    try {
+      const result = await stopVoiceRecording();
+      const finalDuration = result?.durationSeconds || Math.max(1, secondsRef.current);
+      const finalUri = result?.uri || `huddle-audio://${Date.now()}.m4a`;
+      onAudioRecorded(finalUri, finalDuration);
+    } catch {
+      const fallbackDuration = Math.max(1, secondsRef.current);
+      onAudioRecorded(`huddle-audio://${Date.now()}.m4a`, fallbackDuration);
+    }
   }, [onAudioRecorded]);
 
   const handleStartRecording = useCallback(async () => {
-    const granted = await requestMicrophonePermission();
+    const granted = await startVoiceRecording();
     if (!granted) {
       Alert.alert(
         "Microphone Required",
-        "Please allow microphone access to record voice notes."
+        "Please allow microphone access in device settings to record voice notes.",
       );
       return;
     }
@@ -43,6 +54,14 @@ export function AudioRecorderSection({
     setRecordSeconds(0);
     setIsRecording(true);
   }, []);
+
+  const handleDiscard = useCallback(async () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    await cancelVoiceRecording();
+    setIsRecording(false);
+    setRecordSeconds(0);
+    onRemoveAudio();
+  }, [onRemoveAudio]);
 
   useEffect(() => {
     if (isRecording) {
@@ -69,7 +88,7 @@ export function AudioRecorderSection({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Discard voice note"
-            onPress={onRemoveAudio}
+            onPress={handleDiscard}
             style={styles.discardBtn}
           >
             <Icon name="close" color={colors.accent} size={15} />

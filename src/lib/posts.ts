@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { uploadProfileImage } from "./gormati-profiles";
+import { uploadVoiceNote } from "./voiceNotes";
 import { recordUserStreak } from "./streaks";
 import type { CommunityPost } from "../data/mockData";
 
@@ -155,6 +156,7 @@ function saveLocalReplies(repliesMap: Record<string, PostReply[]>): void {
 export async function createPost(draft: PostDraft): Promise<PublishedPost> {
   const postId = generateUUID();
   let remoteImageUrl: string | null = null;
+  let remoteAudioUrl: string | null = null;
 
   // 1. Upload photo to Supabase storage if provided
   if (draft.localImageUri) {
@@ -163,6 +165,16 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
     } catch {
       // If storage upload fails (e.g. offline preview), retain local URI for display
       remoteImageUrl = draft.localImageUri;
+    }
+  }
+
+  // 2. Upload audio recording to Supabase storage with binary ArrayBuffer
+  if (draft.localAudioUri) {
+    try {
+      remoteAudioUrl = await uploadVoiceNote(draft.authorId, draft.localAudioUri);
+    } catch (err) {
+      console.warn("Audio storage upload fallback:", err);
+      remoteAudioUrl = draft.localAudioUri;
     }
   }
 
@@ -183,7 +195,7 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
     audience: draft.audience,
     channel: draft.channel || "General",
     image_url: remoteImageUrl,
-    audio_url: draft.localAudioUri || null,
+    audio_url: remoteAudioUrl,
     audio_duration: draft.audioDuration || null,
     poll_question: draft.pollQuestion || null,
     poll_options: draft.pollOptions || null,
@@ -192,11 +204,11 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
     created_at: nowIso,
   };
 
-  // 2. Persist locally first for immediate responsiveness
+  // 3. Persist locally first for immediate responsiveness
   const current = getLocalStoredPosts();
   saveLocalPosts([publishedPost, ...current.filter((p) => p.id !== postId)]);
 
-  // 3. Save to Supabase posts table
+  // 4. Save to Supabase posts table
   try {
     await (supabase as any).from("posts").insert({
       id: postId,
@@ -207,7 +219,7 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
       audience: draft.audience,
       channel: draft.channel || "General",
       image_url: remoteImageUrl,
-      audio_url: draft.localAudioUri || null,
+      audio_url: remoteAudioUrl,
       audio_duration: draft.audioDuration || null,
       poll_question: draft.pollQuestion || null,
       poll_options: draft.pollOptions || null,
@@ -219,7 +231,7 @@ export async function createPost(draft: PostDraft): Promise<PublishedPost> {
     // Remote insert error caught gracefully; post remains in local cache
   }
 
-  // 4. Update user's consecutive day streak & activity count
+  // 5. Update user's consecutive day streak & activity count
   void recordUserStreak(draft.authorId);
 
   notifyPostListeners();
