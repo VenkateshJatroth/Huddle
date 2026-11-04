@@ -26,6 +26,8 @@ import {
 } from "../lib/notifications";
 import { checkDailyStreakReminder } from "../lib/streaks";
 import { setupUpdateLifecycle } from "../lib/updates";
+import { supabase } from "../lib/supabase";
+import { markAllIncomingAsDelivered, markMessagesAsDelivered } from "../lib/gormati-chat";
 import { AppThemeProvider, useAppColors } from "../theme/colors";
 
 export default function RootLayout() {
@@ -107,6 +109,38 @@ function RootNavigator() {
         }
       });
     }
+  }, [user?.id]);
+
+  // Acknowledge delivered status immediately when messages arrive or upon reconnect
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // 1. Acknowledge messages received while device was offline
+    void markAllIncomingAsDelivered(user.id);
+
+    // 2. Realtime listener for live incoming messages while app is in foreground
+    const channel = supabase
+      .channel(`delivery_receipts_${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "direct_messages",
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = payload.new as any;
+          if (row?.sender_id) {
+            void markMessagesAsDelivered(user.id, row.sender_id);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 
   const handleAcceptCall = () => {

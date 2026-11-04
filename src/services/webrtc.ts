@@ -10,85 +10,40 @@ import type {
   RTCVideoViewProps,
 } from "react-native-webrtc";
 
-export type RTCIceServerConfig = {
-  urls: string | string[];
-  username?: string;
-  credential?: string;
-};
+import {
+  getWebRTCConfiguration,
+  type RTCIceServerConfig,
+} from "./turnService";
 
-// Multi-tier ICE Server Configuration (STUN + TURN Relays)
-export function getIceServers(): RTCIceServerConfig[] {
-  const customTurnUrl = process.env.EXPO_PUBLIC_TURN_URL;
-  const customTurnUsername = process.env.EXPO_PUBLIC_TURN_USERNAME;
-  const customTurnCredential = process.env.EXPO_PUBLIC_TURN_CREDENTIAL;
+export type { RTCIceServerConfig };
 
-  const servers: RTCIceServerConfig[] = [
-    // Tier 1: High-reliability Google & Cloudflare STUN servers
-    {
-      urls: [
-        "stun:stun.l.google.com:19302",
-        "stun:stun1.l.google.com:19302",
-        "stun:stun2.l.google.com:19302",
-        "stun:stun.cloudflare.com:3478",
-      ],
-    },
-  ];
-
-  // Tier 2: Custom TURN relay server if configured via environment variables
-  if (customTurnUrl && customTurnUsername && customTurnCredential) {
-    servers.push({
-      urls: customTurnUrl.split(",").map((u) => u.trim()),
-      username: customTurnUsername,
-      credential: customTurnCredential,
-    });
-  }
-
-  // Tier 3: High-availability OpenRelay / Metered TURN fallback configuration
-  // Supports UDP, TCP (Port 80/3478 to bypass HTTP firewalls), and TURNS/TLS (Port 443/5349 to bypass DPI firewalls)
-  servers.push(
-    {
-      urls: [
-        "turn:openrelay.metered.ca:80",
-        "turn:openrelay.metered.ca:3478",
-      ],
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: [
-        "turn:openrelay.metered.ca:80?transport=tcp",
-        "turn:openrelay.metered.ca:3478?transport=tcp",
-      ],
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: [
-        "turn:openrelay.metered.ca:443",
-        "turns:openrelay.metered.ca:5349",
-      ],
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: [
-        "turns:openrelay.metered.ca:443?transport=tcp",
-        "turns:openrelay.metered.ca:5349?transport=tcp",
-      ],
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-  );
-
-  return servers;
-}
+// Baseline fallback STUN servers
+const DEFAULT_STUN_SERVERS: RTCIceServerConfig[] = [
+  {
+    urls: [
+      "stun:stun.l.google.com:19302",
+      "stun:stun1.l.google.com:19302",
+      "stun:stun2.l.google.com:19302",
+      "stun:stun.cloudflare.com:3478",
+    ],
+  },
+];
 
 export const rtcConfig = {
-  iceServers: getIceServers(),
+  iceServers: DEFAULT_STUN_SERVERS,
   iceCandidatePoolSize: 10,
 };
 
 export const PEER_CONNECTION_CONFIG = rtcConfig;
+
+/**
+ * Dynamically resolves ICE & TURN configuration, fetching short-lived credentials.
+ */
+export async function getPeerConnectionConfig(options?: {
+  relayOnly?: boolean;
+}) {
+  return await getWebRTCConfiguration(options);
+}
 
 /**
  * Triggers an ICE restart on an active RTCPeerConnection if supported.

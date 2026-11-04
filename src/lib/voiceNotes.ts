@@ -1,44 +1,24 @@
 import { Platform } from "react-native";
-import { supabase } from "./supabase";
 import { requestMicrophonePermission } from "./audio";
+import { uploadPrivateChatMedia } from "./chatMedia";
 
 let activeRecorder: any = null;
 let recordingStartTime: number = 0;
 
 /**
- * Uploads a local audio recording to Supabase Storage and returns its public URL.
+ * Uploads a local audio recording to secure private storage and returns its persistent storage path.
  */
 export async function uploadVoiceNote(
   userId: string,
   localUri: string,
 ): Promise<string> {
-  try {
-    const fileName = `chat_audio/${userId}/${Date.now()}.m4a`;
-    const response = await fetch(localUri);
-    const blob = await response.blob();
-    const arrayBuffer = await new Response(blob).arrayBuffer();
-
-    const { error } = await supabase.storage
-      .from("gallery")
-      .upload(fileName, arrayBuffer, {
-        contentType: "audio/m4a",
-        upsert: true,
-      });
-
-    if (error) {
-      console.warn("Storage upload warning:", error.message);
-      return localUri;
-    }
-
-    const { data: publicData } = supabase.storage
-      .from("gallery")
-      .getPublicUrl(fileName);
-
-    return publicData?.publicUrl || localUri;
-  } catch (err) {
-    console.warn("Audio upload fallback to local URI:", err);
-    return localUri;
-  }
+  const { storagePath } = await uploadPrivateChatMedia({
+    userId,
+    localUri,
+    mediaType: "audio",
+    mimeType: "audio/m4a",
+  });
+  return storagePath;
 }
 
 /**

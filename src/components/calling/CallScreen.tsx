@@ -27,6 +27,7 @@ import { supabase } from "../../lib/supabase";
 import {
   configureAudioSessionForCall,
   getLocalStream,
+  getPeerConnectionConfig,
   isWebRTCSupported,
   MediaStream,
   PEER_CONNECTION_CONFIG,
@@ -253,11 +254,22 @@ export function CallScreen({
     });
     signalingChannelRef.current = signalingChannel;
 
-    // 2. Instantiate RTCPeerConnection with Google STUN servers
+    // 2. Instantiate RTCPeerConnection with baseline STUN and refresh with ephemeral TURN
     let pc: any = null;
     try {
       pc = new RTCPeerConnection(PEER_CONNECTION_CONFIG);
       pcRef.current = pc;
+
+      // Asynchronously fetch ephemeral TURN credentials and apply to active peer connection
+      void getPeerConnectionConfig().then((dynamicConfig) => {
+        if (isMounted && pcRef.current && typeof pcRef.current.setConfiguration === "function") {
+          try {
+            pcRef.current.setConfiguration(dynamicConfig);
+          } catch {
+            // Guard
+          }
+        }
+      });
     } catch (err) {
       console.warn("Failed to construct RTCPeerConnection:", err);
       return;
@@ -483,11 +495,15 @@ export function CallScreen({
 
           await pc.setRemoteDescription(new RTCSessionDescription({ type: payload.type, sdp: payload.sdp }));
 
-          // Flush any early arriving ICE candidates
+          // Flush any early arriving ICE candidates with individual error isolation
           while (candidateQueueRef.current.length > 0) {
             const cand = candidateQueueRef.current.shift();
             if (cand) {
-              await pc.addIceCandidate(new RTCIceCandidate(cand));
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              } catch (candErr) {
+                console.warn("Failed to apply queued ICE candidate:", candErr);
+              }
             }
           }
 
@@ -514,11 +530,15 @@ export function CallScreen({
           if (pc.signalingState !== "closed") {
             await pc.setRemoteDescription(new RTCSessionDescription({ type: payload.type, sdp: payload.sdp }));
 
-            // Flush any early arriving ICE candidates
+            // Flush any early arriving ICE candidates with individual error isolation
             while (candidateQueueRef.current.length > 0) {
               const cand = candidateQueueRef.current.shift();
               if (cand) {
-                await pc.addIceCandidate(new RTCIceCandidate(cand));
+                try {
+                  await pc.addIceCandidate(new RTCIceCandidate(cand));
+                } catch (candErr) {
+                  console.warn("Failed to apply queued ICE candidate:", candErr);
+                }
               }
             }
             setCallStatus("connected");

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon } from "../Icon";
 import { formatAudioDuration } from "../../lib/audio";
+import { resolveMediaUrl } from "../../lib/chatMedia";
 import { useAppColors } from "../../theme/colors";
 
 const WAVEFORM_BARS = [
@@ -15,21 +16,39 @@ export function VoiceNoteBubble({
   sent = true,
   timestamp,
   read = false,
+  status,
+  onRetry,
 }: {
   audioUrl: string;
   durationSeconds?: number;
   sent?: boolean;
   timestamp?: string;
   read?: boolean;
+  status?: "sending" | "sent" | "delivered" | "read" | "failed";
+  onRetry?: () => void;
 }) {
   const colors = useAppColors();
   const [isPlaying, setIsPlaying] = useState(false);
   const [positionSec, setPositionSec] = useState(0);
   const [speed, setSpeed] = useState<1 | 1.5 | 2>(1);
+  const [resolvedAudioUrl, setResolvedAudioUrl] = useState(audioUrl);
 
   const playerRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
   const totalDuration = Math.max(1, durationSeconds);
+
+  // Resolve private signed URL if needed
+  useEffect(() => {
+    let active = true;
+    void resolveMediaUrl(audioUrl).then((url) => {
+      if (active && url) {
+        setResolvedAudioUrl(url);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [audioUrl]);
 
   // Clean up player on unmount
   useEffect(() => {
@@ -50,9 +69,11 @@ export function VoiceNoteBubble({
 
   const initPlayer = () => {
     if (playerRef.current) return playerRef.current;
+    const targetUrl = resolvedAudioUrl || audioUrl;
+
     if (Platform.OS === "web") {
       try {
-        const audio = new Audio(audioUrl);
+        const audio = new Audio(targetUrl);
         audio.onended = () => {
           setIsPlaying(false);
           setPositionSec(0);
@@ -69,7 +90,7 @@ export function VoiceNoteBubble({
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { createAudioPlayer } = require("expo-audio");
       if (createAudioPlayer) {
-        const player = createAudioPlayer(audioUrl, { updateInterval: 500 });
+        const player = createAudioPlayer(targetUrl, { updateInterval: 500 });
         player.playbackRate = speed;
         playerRef.current = player;
         return player;
@@ -204,9 +225,20 @@ export function VoiceNoteBubble({
             <Text style={[styles.timeText, { color: metaColor }]}>{timestamp}</Text>
           ) : null}
           {sent ? (
-            <Text style={[styles.checkText, { color: read ? "#4CD964" : metaColor }]}>
-              {read ? "✓✓" : "✓"}
-            </Text>
+            status === "failed" ? (
+              <Pressable onPress={onRetry} hitSlop={6} style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                <Text style={[styles.checkText, { color: "#FFFFFF", fontWeight: "700" }]}>!</Text>
+                <Text style={{ color: "#FFFFFF", fontSize: 10, textDecorationLine: "underline" }}>Retry</Text>
+              </Pressable>
+            ) : status === "sending" ? (
+              <Text style={[styles.checkText, { color: metaColor, fontSize: 10 }]}>⏳</Text>
+            ) : status === "read" || read ? (
+              <Text style={[styles.checkText, { color: "#4CD964", fontWeight: "700" }]}>✓✓</Text>
+            ) : status === "delivered" ? (
+              <Text style={[styles.checkText, { color: metaColor, fontWeight: "700" }]}>✓✓</Text>
+            ) : (
+              <Text style={[styles.checkText, { color: metaColor }]}>✓</Text>
+            )
           ) : null}
         </View>
       </View>

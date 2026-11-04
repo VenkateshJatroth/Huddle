@@ -1,9 +1,10 @@
 import type { PropsWithChildren, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image, type ImageSource } from "expo-image";
+import { resolveMediaUrl } from "../lib/chatMedia";
 import { useAppColors } from "../theme/colors";
 import { Icon, type AppIconName } from "./Icon";
 
@@ -318,17 +319,62 @@ export function ChatBubble({
   timestamp,
   imageUrl,
   read = false,
+  status,
+  onRetry,
 }: {
   message: string;
   sent?: boolean;
   timestamp?: string;
   imageUrl?: string | null;
   read?: boolean;
+  status?: "sending" | "sent" | "delivered" | "read" | "failed";
+  onRetry?: () => void;
 }) {
   const colors = useAppColors();
-  const backgroundColor = sent ? colors.accent : colors.subtle;
+  const backgroundColor = sent ? (status === "failed" ? "#E53935" : colors.accent) : colors.subtle;
   const textColor = sent ? "#FFFFFF" : colors.text;
   const metaColor = sent ? "rgba(255,255,255,0.75)" : colors.secondary;
+
+  const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!imageUrl) {
+      return;
+    }
+    void resolveMediaUrl(imageUrl).then((url) => {
+      if (active) {
+        setResolvedImageUrl(url || null);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [imageUrl]);
+
+  const activeImageUrl = imageUrl ? resolvedImageUrl : null;
+
+  const renderStatusIndicator = () => {
+    if (!sent) return null;
+    if (status === "failed") {
+      return (
+        <Pressable onPress={onRetry} hitSlop={6} style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+          <Text style={[styles.chatBubbleCheck, { color: "#FFFFFF", fontWeight: "700" }]}>!</Text>
+          <Text style={{ color: "#FFFFFF", fontSize: 11, textDecorationLine: "underline" }}>Retry</Text>
+        </Pressable>
+      );
+    }
+    if (status === "sending") {
+      return <Text style={[styles.chatBubbleCheck, { color: metaColor, fontSize: 11 }]}>⏳</Text>;
+    }
+    if (status === "read" || read) {
+      return <Text style={[styles.chatBubbleCheck, { color: "#4CD964", fontWeight: "700" }]}>✓✓</Text>;
+    }
+    if (status === "delivered") {
+      return <Text style={[styles.chatBubbleCheck, { color: metaColor, fontWeight: "700" }]}>✓✓</Text>;
+    }
+    return <Text style={[styles.chatBubbleCheck, { color: metaColor }]}>✓</Text>;
+  };
 
   return (
     <View
@@ -338,9 +384,9 @@ export function ChatBubble({
         { backgroundColor },
       ]}
     >
-      {imageUrl ? (
+      {activeImageUrl ? (
         <Image
-          source={{ uri: imageUrl }}
+          source={{ uri: activeImageUrl }}
           style={styles.chatBubbleImage}
           contentFit="cover"
         />
@@ -352,11 +398,7 @@ export function ChatBubble({
         {timestamp ? (
           <Text style={[styles.chatBubbleTime, { color: metaColor }]}>{timestamp}</Text>
         ) : null}
-        {sent ? (
-          <Text style={[styles.chatBubbleCheck, { color: read ? "#4CD964" : metaColor }]}>
-            {read ? "✓✓" : "✓"}
-          </Text>
-        ) : null}
+        {renderStatusIndicator()}
       </View>
     </View>
   );

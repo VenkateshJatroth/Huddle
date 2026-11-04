@@ -30,9 +30,13 @@ import {
 import {
   DATE_PROMPTS,
   fetchConversationMessages,
+  flushOfflineMessages,
+  markMessagesAsDelivered,
   markMessagesAsRead,
+  retryFailedMessage,
   sendChatMessage,
   sendVoiceNoteMessage,
+  subscribeToChatPresence,
   subscribeToMessages,
   subscribeToTypingIndicator,
 } from "../../lib/gormati-chat";
@@ -59,9 +63,12 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
+  const [isPartnerOnline, setIsPartnerOnline] = useState(false);
   const [safetyModalVisible, setSafetyModalVisible] = useState(false);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [recordDuration, setRecordDuration] = useState(0);
@@ -79,7 +86,7 @@ export default function ChatScreen() {
     }
   }, []);
 
-  // Load member details & initial messages
+  // Load member details & initial messages, plus flush any offline outbox
   useEffect(() => {
     let isCurrent = true;
 
@@ -89,14 +96,19 @@ export default function ChatScreen() {
       try {
         const [profileData, messageHistory] = await Promise.all([
           fetchMemberProfile(id),
-          fetchConversationMessages(user.id, id),
+          fetchConversationMessages(user.id, id, { limit: 40 }),
         ]);
         if (!isCurrent) return;
         setMember(profileData);
         setMessages(messageHistory);
+        setHasMore(messageHistory.length >= 40);
 
-        // Mark incoming messages as read
+        // Mark incoming messages as delivered & read
+        void markMessagesAsDelivered(user.id, id);
         void markMessagesAsRead(user.id, id);
+
+        // Flush queued offline messages
+        void flushOfflineMessages(user.id);
       } finally {
         if (isCurrent) setIsLoading(false);
       }
@@ -104,6 +116,17 @@ export default function ChatScreen() {
 
     void init();
     return () => { isCurrent = false; };
+  }, [id, user]);
+
+  // Realtime presence subscription
+  useEffect(() => {
+    if (!id || !user) return;
+    const unsubPresence = subscribeToChatPresence(user.id, id, (online) => {
+      setIsPartnerOnline(online);
+    });
+    return () => {
+      unsubPresence();
+    };
   }, [id, user]);
 
   // Realtime message subscription + live updates
@@ -115,17 +138,28 @@ export default function ChatScreen() {
       id,
       (incoming) => {
         setMessages((prev) => {
-          if (prev.some((m) => m.id === incoming.id)) return prev;
+          if (prev.some((m) => m.id === incoming.id || (m.client_id && m.client_id === incoming.client_id))) {
+            return prev.map((m) =>
+              m.id === incoming.id || (m.client_id && m.client_id === incoming.client_id)
+                ? incoming
+                : m,
+            );
+          }
           return [...prev, incoming];
         });
-        // Mark as read if sent by partner
+        // Mark as delivered and read if sent by partner
         if (incoming.sender_id === id) {
+          void markMessagesAsDelivered(user.id, id);
           void markMessagesAsRead(user.id, id);
         }
       },
       (updated) => {
         setMessages((prev) =>
-          prev.map((m) => (m.id === updated.id ? { ...m, read_at: updated.read_at } : m)),
+          prev.map((m) =>
+            m.id === updated.id || (m.client_id && m.client_id === updated.client_id)
+              ? { ...m, ...updated }
+              : m,
+          ),
         );
       },
     );
@@ -251,11 +285,62 @@ export default function ChatScreen() {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Failed to send voice note:", err);
+      Alert.alert(
+        "Voice Note Not Sent",
+        err?.message || "Could not upload private voice note. Please check your connection and try again.",
+      );
     } finally {
       setIsSending(false);
       setRecordDuration(0);
+    }
+  };
+
+  const handleLoadEarlierMessages = async () => {
+    if (!id || !user || isLoadingMore || !hasMore || messages.length === 0) return;
+    setIsLoadingMore(true);
+    try {
+      const oldest = messages[0];
+      const cursor = oldest.raw_created_at;
+      if (!cursor) {
+        setHasMore(false);
+        return;
+      }
+      const older = await fetchConversationMessages(user.id, id, {
+        limit: 30,
+        before: cursor,
+        beforeId: oldest.id,
+      });
+      if (older.length === 0) {
+        setHasMore(false);
+      } else {
+        setMessages((prev) => [...older, ...prev]);
+        setHasMore(older.length >= 30);
+      }
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  const handleRetryMessage = async (msgToRetry: ChatMessage) => {
+    if (!user) return;
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msgToRetry.id ? { ...m, status: "sending" } : m)),
+    );
+    try {
+      const updated = await retryFailedMessage(user.id, msgToRetry);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === msgToRetry.id || (m.client_id && m.client_id === msgToRetry.client_id)
+            ? updated
+            : m,
+        ),
+      );
+    } catch {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msgToRetry.id ? { ...m, status: "failed" } : m)),
+      );
     }
   };
 
@@ -355,11 +440,17 @@ export default function ChatScreen() {
               <View
                 style={[
                   styles.statusDot,
-                  { backgroundColor: isPartnerTyping ? colors.accent : colors.success },
+                  {
+                    backgroundColor: isPartnerTyping
+                      ? colors.accent
+                      : isPartnerOnline
+                        ? colors.success
+                        : colors.secondary,
+                  },
                 ]}
               />
               <Text style={[styles.statusText, { color: isPartnerTyping ? colors.accent : colors.secondary }]}>
-                {isPartnerTyping ? "Typing…" : "Active now"}
+                {isPartnerTyping ? "Typing…" : isPartnerOnline ? "Online" : "Active recently"}
               </Text>
             </View>
           </View>
@@ -408,9 +499,26 @@ export default function ChatScreen() {
         <FlatList
           ref={flatListRef}
           data={messages}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.client_id || item.id}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          ListHeaderComponent={
+            hasMore && messages.length > 0 ? (
+              <Pressable
+                onPress={handleLoadEarlierMessages}
+                disabled={isLoadingMore}
+                style={{ alignSelf: "center", paddingVertical: 10, paddingHorizontal: 16 }}
+              >
+                {isLoadingMore ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : (
+                  <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
+                    Load earlier messages
+                  </Text>
+                )}
+              </Pressable>
+            ) : undefined
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyTitle, { color: colors.text }]}>No messages yet</Text>
@@ -427,12 +535,13 @@ export default function ChatScreen() {
                 item.image_url &&
                   (item.image_url.includes(".m4a") ||
                     item.image_url.includes("/chat_audio/") ||
+                    item.image_url.includes("/chat_media/") ||
                     item.image_url.startsWith("data:audio")),
               );
 
             if (isVoiceNote && item.image_url) {
               const match = item.content?.match(/\[Voice Note\|(\d+)s\]/);
-              const duration = match ? parseInt(match[1], 10) : 12;
+              const duration = match ? parseInt(match[1], 10) : item.media_duration || 12;
               return (
                 <VoiceNoteBubble
                   audioUrl={item.image_url}
@@ -440,6 +549,8 @@ export default function ChatScreen() {
                   sent={isMe}
                   timestamp={item.created_at}
                   read={Boolean(item.read_at)}
+                  status={item.status}
+                  onRetry={() => handleRetryMessage(item)}
                 />
               );
             }
@@ -451,6 +562,8 @@ export default function ChatScreen() {
                 timestamp={item.created_at}
                 imageUrl={item.image_url}
                 read={Boolean(item.read_at)}
+                status={item.status}
+                onRetry={() => handleRetryMessage(item)}
               />
             );
           }}

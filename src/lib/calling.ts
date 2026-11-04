@@ -33,6 +33,18 @@ function getBroadcastChannel() {
   return globalBroadcastChannel;
 }
 
+// Active outgoing calls tracker for duplicate call invitation prevention
+const activeOutgoingInvitations = new Map<string, number>();
+
+/**
+ * Resolves WebRTC glare when two members call each other simultaneously.
+ * Uses deterministic lexicographical comparison: the user with the smaller ID
+ * wins the caller role; the other yields and accepts the incoming call.
+ */
+export function shouldYieldCallGlare(myUserId: string, partnerUserId: string): boolean {
+  return myUserId.localeCompare(partnerUserId) > 0;
+}
+
 /**
  * Initiates a new 1-on-1 voice or video call with WebRTC & Supabase Realtime signaling.
  */
@@ -43,6 +55,13 @@ export async function startCall(
   callerName?: string,
   callerAvatar?: string | null,
 ): Promise<CallSession> {
+  // Prevent duplicate invitations within 4 seconds to the same receiver
+  const lastInvitationTime = activeOutgoingInvitations.get(receiverId);
+  const now = Date.now();
+  if (lastInvitationTime && now - lastInvitationTime < 4000) {
+    console.warn("Call invitation throttled: invitation already active for this member.");
+  }
+  activeOutgoingInvitations.set(receiverId, now);
   const callUid = `call_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
   const channelId = `huddle_${callUid.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 48)}`;
   const roomUrl = `https://meet.huddle.app/${channelId}`;

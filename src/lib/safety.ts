@@ -67,6 +67,23 @@ export async function loadBlockedUserIds(currentUserId?: string): Promise<string
     console.warn("[Safety] Error loading blocked users from storage:", err);
   }
 
+  // Also sync from backend blocked_users table if user is signed in
+  try {
+    const { data: dbBlocked } = await (supabase as any)
+      .from("blocked_users")
+      .select("blocked_user_id")
+      .eq("blocker_id", currentUserId);
+
+    if (dbBlocked && Array.isArray(dbBlocked)) {
+      dbBlocked.forEach((row: any) => {
+        if (row.blocked_user_id) blockedUserIdsSet.add(row.blocked_user_id);
+      });
+      notifyListeners();
+    }
+  } catch (err) {
+    console.warn("[Safety] Notice syncing blocked_users from backend:", err);
+  }
+
   return Array.from(blockedUserIdsSet);
 }
 
@@ -92,8 +109,16 @@ export async function blockMember(currentUserId: string, targetUserId: string): 
     console.warn("[Safety] Error saving blocked users locally:", err);
   }
 
-  // Attempt backend storage / clean up mutual relationship
+  // Persist to backend blocked_users table and clean up mutual relationship
   try {
+    await (supabase as any).from("blocked_users").upsert(
+      {
+        blocker_id: currentUserId,
+        blocked_user_id: targetUserId,
+      },
+      { onConflict: "blocker_id,blocked_user_id" },
+    );
+
     // Clean up follow relationships
     await supabase
       .from("follow_relationships")
@@ -103,14 +128,48 @@ export async function blockMember(currentUserId: string, targetUserId: string): 
       );
 
     // Clean up direct messages
-    await supabase
-      .from("messages")
+    await (supabase as any)
+      .from("direct_messages")
       .delete()
       .or(
         `and(sender_id.eq.${currentUserId},receiver_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},receiver_id.eq.${currentUserId})`,
       );
   } catch (err) {
-    console.log("[Safety] Optional backend cleanup notice:", err);
+    console.log("[Safety] Backend block sync notice:", err);
+  }
+
+  return true;
+}
+
+/**
+ * Unblock a member. Updates local state and removes from backend.
+ */
+export async function unblockMember(currentUserId: string, targetUserId: string): Promise<boolean> {
+  if (!targetUserId || targetUserId === currentUserId) return false;
+
+  blockedUserIdsSet.delete(targetUserId);
+  notifyListeners();
+
+  try {
+    const list = Array.from(blockedUserIdsSet);
+    const serialized = JSON.stringify(list);
+    if (Platform.OS !== "web") {
+      await SecureStore.setItemAsync(BLOCKED_USERS_KEY + currentUserId, serialized);
+    } else if (typeof localStorage !== "undefined") {
+      localStorage.setItem(BLOCKED_USERS_KEY + currentUserId, serialized);
+    }
+  } catch (err) {
+    console.warn("[Safety] Error saving unblock locally:", err);
+  }
+
+  try {
+    await (supabase as any)
+      .from("blocked_users")
+      .delete()
+      .eq("blocker_id", currentUserId)
+      .eq("blocked_user_id", targetUserId);
+  } catch (err) {
+    console.log("[Safety] Backend unblock sync notice:", err);
   }
 
   return true;
