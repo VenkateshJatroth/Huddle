@@ -4,22 +4,37 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Huddle: Let's Connect — Official Website & Android APK</title>
-  <meta name="description" content="Download Huddle for Android at joinhuddl.me. The authentic mobile social platform featuring real-time WebRTC 1-on-1 voice & video calling, anonymous confessions, secret sparks, and daily hot take battles." />
-  <meta name="theme-color" content="#08080a" />
+  <meta name="description" content="Join Huddle for HD voice & video calling, anonymous confessions, secret sparks, and daily hot takes. Download the official Android APK." />
   <link rel="canonical" href="https://joinhuddl.me/" />
 
-  <!-- Open Graph / Social Sharing -->
+  <!-- App Theming & Status Bar -->
+  <meta name="theme-color" content="#ec4899" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Huddle" />
+
+  <!-- Open Graph / Facebook / WhatsApp / Instagram -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://joinhuddl.me/" />
-  <meta property="og:title" content="Huddle: Let's Connect — Official Website (joinhuddl.me)" />
-  <meta property="og:description" content="Real-time WebRTC voice & video calling, anonymous confessions, secret compliments, and daily hot takes. Download the verified Android APK now." />
-  <meta property="og:image" content="https://joinhuddl.me/assets/logo.png" />
+  <meta property="og:site_name" content="Huddle" />
+  <meta property="og:title" content="Huddle — Real Voices. Secret Sparks. Zero Fake Profiles." />
+  <meta property="og:description" content="Join Huddle for HD voice & video calling, anonymous confessions, secret sparks, and daily hot takes. Download the official Android APK." />
+  <meta property="og:image" content="https://joinhuddl.me/og-image.png" />
+  <meta property="og:image:secure_url" content="https://joinhuddl.me/og-image.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1024" />
+  <meta property="og:image:height" content="1024" />
+  <meta property="og:image:alt" content="Huddle — Real Voices. Secret Sparks. Official Community App." />
 
-  <!-- Twitter Meta -->
+  <!-- Twitter / X Meta -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Huddle: Let's Connect (joinhuddl.me)" />
-  <meta name="twitter:description" content="Real-time WebRTC calling, anonymous confessions, and authentic community." />
-  <meta name="twitter:image" content="https://joinhuddl.me/assets/logo.png" />
+  <meta name="twitter:site" content="@HuddleSocial" />
+  <meta name="twitter:creator" content="@VenkateshJatroth" />
+  <meta name="twitter:url" content="https://joinhuddl.me/" />
+  <meta name="twitter:title" content="Huddle — Real Voices. Secret Sparks. Zero Fake Profiles." />
+  <meta name="twitter:description" content="HD voice & video calling, anonymous confessions, secret sparks, and daily hot takes. Download now on Android." />
+  <meta name="twitter:image" content="https://joinhuddl.me/og-image.png" />
+  <meta name="twitter:image:alt" content="Huddle — Let's Connect" />
 
   <link rel="icon" type="image/png" href="./assets/icon.png" />
 
@@ -92,7 +107,6 @@
       border-color: #ec4899 !important;
       color: #ffffff !important;
     }
-    /* Smooth custom scrollbars */
     ::-webkit-scrollbar {
       width: 8px;
     }
@@ -143,7 +157,7 @@
         </nav>
 
         <a 
-          href="https://expo.dev/artifacts/eas/YDrbENeKJra9P7ZGWrr4xxWax8_dWuZaiRNq7ktWsuI.apk" 
+          href="https://expo.dev/artifacts/eas/4RVETeMRqec4ITGXMaLem1yPsgoAQwgnZGGBB-kpAnc.apk" 
           download
           class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold text-white bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
@@ -182,7 +196,7 @@
           <!-- Left Column: Primary CTA & Trust Pill -->
           <div class="md:col-span-7 text-left space-y-4">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-pink-500/15 border border-pink-500/25 text-pink-400 text-xs font-bold">
-              <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> Android Standalone APK
+              <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> Android Standalone APK (v1.0)
             </div>
 
             <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
@@ -192,11 +206,11 @@
               Engineered with native WebRTC P2P + TURN relay calling, on-device photo compression, and sub-100ms real-time signaling.
             </p>
 
-            <!-- Primary CTA Button -->
+            <!-- Primary CTA & Action Buttons -->
             <div class="pt-2 flex flex-col sm:flex-row gap-3">
               <a 
                 id="hero-download-btn"
-                href="https://expo.dev/artifacts/eas/YDrbENeKJra9P7ZGWrr4xxWax8_dWuZaiRNq7ktWsuI.apk" 
+                href="https://expo.dev/artifacts/eas/4RVETeMRqec4ITGXMaLem1yPsgoAQwgnZGGBB-kpAnc.apk" 
                 download
                 class="inline-flex items-center justify-center gap-3 px-6 py-4 rounded-2xl text-base font-extrabold text-white bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 shadow-xl shadow-pink-500/35 hover:shadow-pink-500/55 hover:scale-[1.02] active:scale-[0.98] transition-all animate-glow-pulse"
               >
@@ -207,14 +221,27 @@
                 </div>
               </a>
 
+              <!-- Native Web Share / Copy Link Button -->
+              <button 
+                onclick="shareHuddle()" 
+                id="share-btn"
+                type="button"
+                class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold text-zinc-300 bg-brand-card border border-brand-border hover:border-pink-500/50 hover:text-white transition group"
+              >
+                <i data-lucide="share-2" class="w-4 h-4 text-pink-400 group-hover:scale-110 transition"></i>
+                <span id="share-btn-text">Share Huddle</span>
+              </button>
+
+              <!-- EAS Dashboard Link -->
               <a 
                 href="https://expo.dev/accounts/venkateshjatroths-team/projects/huddle-social/builds/7607430c-1d63-427f-9fdf-1568751c537c" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold text-zinc-300 bg-brand-card border border-brand-border hover:border-zinc-500 hover:text-white transition"
+                class="inline-flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-xs font-bold text-zinc-400 bg-brand-card border border-brand-border hover:border-zinc-500 hover:text-white transition"
+                title="View cloud build on EAS"
               >
                 <i data-lucide="external-link" class="w-4 h-4 text-purple-400"></i>
-                <span>EAS Dashboard</span>
+                <span class="hidden sm:inline">Build</span>
               </a>
             </div>
 
@@ -235,18 +262,18 @@
           <!-- Right Column: Live Scannable QR Code Card (Desktop/Tablet) -->
           <div class="md:col-span-5 flex flex-col items-center justify-center bg-brand-card/90 border border-brand-border/80 rounded-2xl p-5 text-center shadow-lg">
             <span class="text-xs font-bold text-zinc-200 mb-2 flex items-center gap-1.5">
-              <i data-lucide="qr-code" class="w-4 h-4 text-pink-400"></i> Scan to Install on Phone
+              <i data-lucide="qr-code" class="w-4 h-4 text-pink-400"></i> Scan to Download Directly
             </span>
             <div class="p-2.5 rounded-2xl bg-white shadow-xl mb-3 border border-zinc-200">
               <img 
-                src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fjoinhuddl.me%2F&margin=4&color=08080a&bgcolor=ffffff" 
-                alt="Scan QR code to install Huddle on Android" 
+                src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fexpo.dev%2Fartifacts%2Feas%2F4RVETeMRqec4ITGXMaLem1yPsgoAQwgnZGGBB-kpAnc.apk&margin=4&color=08080a&bgcolor=ffffff" 
+                alt="Scan QR code to install Huddle APK directly on Android" 
                 class="w-36 h-36 object-contain"
                 loading="lazy"
               />
             </div>
             <p class="text-[11px] text-zinc-400 max-w-[210px] leading-relaxed">
-              Open your smartphone camera and point at this code to install Huddle directly.
+              Scan with your phone camera to download the APK directly.
             </p>
           </div>
 
@@ -611,7 +638,7 @@
         </div>
 
         <!-- Feature 4: Hot Takes -->
-        <div class="bg-brand-surface border border-brand-border rounded-2xl p-6 hover:border-orange-500/40 hover:-translate-y-1 transition duration-300 group">
+        <div class="bg-brand-surface border border-orange-500/40 hover:-translate-y-1 transition duration-300 group rounded-2xl p-6">
           <div class="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center mb-5 group-hover:scale-110 transition">
             <i data-lucide="flame" class="w-6 h-6"></i>
           </div>
@@ -789,14 +816,25 @@
           Experience real-time voice & video calls, anonymous confessions, and secret sparks on Android.
         </p>
 
-        <a 
-          href="https://expo.dev/artifacts/eas/YDrbENeKJra9P7ZGWrr4xxWax8_dWuZaiRNq7ktWsuI.apk"
-          download 
-          class="inline-flex items-center gap-3 px-8 py-4 rounded-2xl text-base font-extrabold text-white bg-gradient-to-r from-pink-500 to-purple-600 shadow-xl shadow-pink-500/25 hover:shadow-pink-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
-        >
-          <i data-lucide="download" class="w-5 h-5"></i>
-          <span>Download Huddle APK (Direct)</span>
-        </a>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a 
+            href="https://expo.dev/artifacts/eas/4RVETeMRqec4ITGXMaLem1yPsgoAQwgnZGGBB-kpAnc.apk"
+            download 
+            class="inline-flex items-center gap-3 px-8 py-4 rounded-2xl text-base font-extrabold text-white bg-gradient-to-r from-pink-500 to-purple-600 shadow-xl shadow-pink-500/25 hover:shadow-pink-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
+            <i data-lucide="download" class="w-5 h-5"></i>
+            <span>Download Huddle APK (Direct)</span>
+          </a>
+
+          <button 
+            onclick="shareHuddle()"
+            type="button"
+            class="inline-flex items-center gap-2 px-6 py-4 rounded-2xl text-sm font-bold text-zinc-200 bg-brand-surface border border-brand-border hover:border-pink-500/40 hover:text-white transition"
+          >
+            <i data-lucide="share-2" class="w-4 h-4 text-pink-400"></i>
+            <span>Share Link</span>
+          </button>
+        </div>
 
         <div class="mt-4 flex items-center justify-center gap-4 text-[11px] text-zinc-400">
           <span class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-green-400"></i> Signed Binary</span>
@@ -822,14 +860,24 @@
         </div>
       </div>
 
-      <a 
-        href="https://expo.dev/artifacts/eas/YDrbENeKJra9P7ZGWrr4xxWax8_dWuZaiRNq7ktWsuI.apk" 
-        download
-        class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-pink-500 to-purple-600 shadow-md shadow-pink-500/25 active:scale-95 transition-all flex-shrink-0"
-      >
-        <i data-lucide="download" class="w-3.5 h-3.5"></i>
-        <span>Download APK</span>
-      </a>
+      <div class="flex items-center gap-2">
+        <button 
+          onclick="shareHuddle()"
+          type="button"
+          class="p-2.5 rounded-xl text-zinc-400 bg-brand-surface border border-brand-border active:scale-95 transition"
+          title="Share"
+        >
+          <i data-lucide="share-2" class="w-4 h-4 text-pink-400"></i>
+        </button>
+        <a 
+          href="https://expo.dev/artifacts/eas/4RVETeMRqec4ITGXMaLem1yPsgoAQwgnZGGBB-kpAnc.apk" 
+          download
+          class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-pink-500 to-purple-600 shadow-md shadow-pink-500/25 active:scale-95 transition-all flex-shrink-0"
+        >
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>Get APK</span>
+        </a>
+      </div>
     </div>
   </aside>
 
@@ -909,6 +957,44 @@
       } else {
         content.classList.add('hidden');
         icon.classList.remove('rotate-180');
+      }
+    }
+
+    // Native Web Share API with Clipboard Fallback
+    async function shareHuddle() {
+      const shareData = {
+        title: "Join me on Huddle!",
+        text: "Check out Huddle — HD voice calling, Secret Sparks & Anonymous Confessions:",
+        url: "https://joinhuddl.me"
+      };
+
+      const btnText = document.getElementById("share-btn-text");
+
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+          return;
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            console.warn('Share error:', err);
+          }
+        }
+      }
+
+      // Fallback: Copy URL to clipboard
+      try {
+        await navigator.clipboard.writeText("https://joinhuddl.me");
+        if (btnText) {
+          const original = btnText.textContent;
+          btnText.textContent = "Link Copied! ✓";
+          setTimeout(() => {
+            btnText.textContent = original;
+          }, 2500);
+        } else {
+          alert("Huddle link copied to clipboard: https://joinhuddl.me");
+        }
+      } catch (e) {
+        prompt("Copy Huddle link:", "https://joinhuddl.me");
       }
     }
 
