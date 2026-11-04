@@ -239,6 +239,11 @@ export function CallScreen({
 
     if (!isWebRTCSupported) {
       console.warn("WebRTC is not supported in this runtime environment.");
+      Alert.alert(
+        "Calling Requires Native App",
+        "Real-time voice and video calling requires the standalone Huddle APK installed on an Android device (WebRTC native module is not bundled in Expo Go). Please install the verified APK from joinhuddl.me.",
+        [{ text: "OK", onPress: () => handleEndCall() }],
+      );
       return;
     }
 

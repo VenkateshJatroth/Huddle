@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -198,11 +199,19 @@ export default function ChatScreen() {
   };
 
   const handleStartCall = async (callType: "voice" | "video") => {
-    if (!user || !member?.id) return;
+    const targetMemberId = member?.id || id;
+    if (!user) {
+      Alert.alert("Sign In Required", "Please sign in to make voice or video calls.");
+      return;
+    }
+    if (!targetMemberId) {
+      Alert.alert("Cannot Place Call", "Recipient member information is not available.");
+      return;
+    }
     try {
       const call = await startCall(
         user.id,
-        member.id,
+        targetMemberId,
         callType,
         user.user_metadata?.full_name || user.email?.split("@")[0] || "Member",
         user.user_metadata?.avatar_url,
@@ -210,7 +219,7 @@ export default function ChatScreen() {
       router.push({
         pathname: "/call/[id]",
         params: {
-          id: member.id,
+          id: targetMemberId,
           callId: call.id,
           type: callType,
           channelId: call.agora_channel || undefined,
@@ -220,7 +229,7 @@ export default function ChatScreen() {
     } catch {
       router.push({
         pathname: "/call/[id]",
-        params: { id: member.id, type: callType },
+        params: { id: targetMemberId, type: callType },
       } as never);
     }
   };

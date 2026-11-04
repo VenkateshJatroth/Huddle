@@ -1,5 +1,5 @@
 import React from "react";
-import { Platform, View, type ViewProps } from "react-native";
+import { PermissionsAndroid, Platform, View, type ViewProps } from "react-native";
 import { setAudioModeAsync } from "expo-audio";
 import type {
   MediaStream as WebRTCMediaStream,
@@ -129,26 +129,62 @@ export async function resetAudioSession(): Promise<void> {
   }
 }
 
-// Safe native module loading with fallback for Web / older APKs
-let nativeWebRTC: typeof import("react-native-webrtc") | null = null;
-
-try {
-  if (Platform.OS !== "web") {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    nativeWebRTC = require("react-native-webrtc");
+/**
+ * Requests device microphone and camera permissions required for calls.
+ */
+export async function requestCallingPermissions(video: boolean = false): Promise<boolean> {
+  if (Platform.OS === "android") {
+    try {
+      const perms: any[] = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+      if (video) {
+        perms.push(PermissionsAndroid.PERMISSIONS.CAMERA);
+      }
+      const results = await PermissionsAndroid.requestMultiple(perms);
+      const audioGranted = results[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED;
+      const cameraGranted = !video || results[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED;
+      return audioGranted && cameraGranted;
+    } catch (err) {
+      console.warn("Failed to request Android calling permissions:", err);
+      return false;
+    }
   }
-} catch (err) {
-  console.warn("react-native-webrtc is not available in this environment:", err);
+  return true;
 }
-
-export const isWebRTCSupported = Boolean(
-  nativeWebRTC && typeof nativeWebRTC.RTCPeerConnection === "function",
-);
 
 // Fallback dummy component for RTCView when native binary is missing
 function FallbackRTCView(props: ViewProps & { streamURL?: string; mirror?: boolean; objectFit?: string; zOrder?: number }) {
   return React.createElement(View, props);
 }
+
+// Safe native module loading with fallback for Web / older APKs
+let nativeWebRTC: any = null;
+
+if (Platform.OS === "web") {
+  if (typeof window !== "undefined") {
+    const w = window as any;
+    if (w.RTCPeerConnection || w.webkitRTCPeerConnection) {
+      nativeWebRTC = {
+        RTCPeerConnection: w.RTCPeerConnection || w.webkitRTCPeerConnection,
+        RTCIceCandidate: w.RTCIceCandidate,
+        RTCSessionDescription: w.RTCSessionDescription,
+        MediaStream: w.MediaStream,
+        mediaDevices: typeof navigator !== "undefined" ? navigator.mediaDevices : null,
+        RTCView: FallbackRTCView,
+      };
+    }
+  }
+} else {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    nativeWebRTC = require("react-native-webrtc");
+  } catch (err) {
+    console.warn("react-native-webrtc is not available in this environment:", err);
+  }
+}
+
+export const isWebRTCSupported = Boolean(
+  nativeWebRTC && typeof nativeWebRTC.RTCPeerConnection === "function",
+);
 
 export const RTCPeerConnection = nativeWebRTC?.RTCPeerConnection ?? (class {} as unknown as typeof WebRTCPeerConnection);
 export const RTCIceCandidate = nativeWebRTC?.RTCIceCandidate ?? (class {} as unknown as typeof WebRTCIceCandidate);
@@ -163,6 +199,9 @@ export type { WebRTCMediaStream, WebRTCMediaStreamTrack };
  * Acquires local audio and optional video media stream.
  */
 export async function getLocalStream(video: boolean = false): Promise<WebRTCMediaStream | null> {
+  // First ensure runtime permissions on Android
+  await requestCallingPermissions(video);
+
   if (!mediaDevices || !isWebRTCSupported) {
     console.warn("WebRTC mediaDevices unavailable on this platform.");
     return null;

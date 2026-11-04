@@ -121,11 +121,19 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
   }, [memberId, user?.id]);
 
   const handleStartCall = async (callType: "voice" | "video") => {
-    if (!user || !profile) return;
+    const targetMemberId = profile?.id || memberId;
+    if (!user) {
+      Alert.alert("Sign In Required", "Please sign in to make voice or video calls.");
+      return;
+    }
+    if (!targetMemberId) {
+      Alert.alert("Cannot Place Call", "Member profile could not be resolved.");
+      return;
+    }
     try {
       const call = await startCall(
         user.id,
-        profile.id,
+        targetMemberId,
         callType,
         user.user_metadata?.full_name || user.email?.split("@")[0] || "Member",
         user.user_metadata?.avatar_url,
@@ -133,7 +141,7 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
       router.push({
         pathname: "/call/[id]",
         params: {
-          id: profile.id,
+          id: targetMemberId,
           callId: call.id,
           type: callType,
           channelId: call.agora_channel || undefined,
@@ -143,7 +151,7 @@ export function MemberProfileView({ memberId, onBack }: MemberProfileViewProps) 
     } catch {
       router.push({
         pathname: "/call/[id]",
-        params: { id: profile.id, type: callType },
+        params: { id: targetMemberId, type: callType },
       } as never);
     }
   };
