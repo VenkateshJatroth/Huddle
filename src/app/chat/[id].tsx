@@ -20,6 +20,7 @@ import { compressImage } from "../../utils/imageCompression";
 import { useAuth } from "../../auth/AuthProvider";
 import { Icon } from "../../components/Icon";
 import { SafetyActionModal } from "../../components/SafetyActionModal";
+import { VoiceNoteBubble } from "../../components/chat/VoiceNoteBubble";
 import {
   Avatar,
   ChatBubble,
@@ -31,6 +32,7 @@ import {
   fetchConversationMessages,
   markMessagesAsRead,
   sendChatMessage,
+  sendVoiceNoteMessage,
   subscribeToMessages,
   subscribeToTypingIndicator,
 } from "../../lib/gormati-chat";
@@ -38,6 +40,13 @@ import type { ChatMessage } from "../../lib/gormati-chat";
 import { fetchMemberProfile } from "../../lib/gormati-profiles";
 import type { GormatiProfile } from "../../lib/gormati-profiles";
 import { startCall } from "../../lib/calling";
+import { formatAudioDuration } from "../../lib/audio";
+import {
+  cancelVoiceRecording,
+  startVoiceRecording,
+  stopVoiceRecording,
+  uploadVoiceNote,
+} from "../../lib/voiceNotes";
 import { useAppColors } from "../../theme/colors";
 
 export default function ChatScreen() {
@@ -54,10 +63,13 @@ export default function ChatScreen() {
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const [safetyModalVisible, setSafetyModalVisible] = useState(false);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [recordDuration, setRecordDuration] = useState(0);
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendTypingRef = useRef<((isTyping: boolean) => void) | null>(null);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleBack = useCallback(() => {
     if (router.canGoBack()) {
@@ -193,6 +205,59 @@ export default function ChatScreen() {
       setIsSending(false);
     }
   }, [id, inputText, isSending, selectedPhotoUri, user]);
+
+  const handleStartRecord = async () => {
+    const success = await startVoiceRecording();
+    if (!success) {
+      Alert.alert(
+        "Microphone Required",
+        "Please allow microphone access in device settings to record voice notes.",
+      );
+      return;
+    }
+    setIsRecordingAudio(true);
+    setRecordDuration(0);
+    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    recordTimerRef.current = setInterval(() => {
+      setRecordDuration((prev) => prev + 1);
+    }, 1000);
+  };
+
+  const handleCancelRecord = async () => {
+    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    await cancelVoiceRecording();
+    setIsRecordingAudio(false);
+    setRecordDuration(0);
+  };
+
+  const handleSendRecord = async () => {
+    if (!user || !id) return;
+    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    setIsRecordingAudio(false);
+    setIsSending(true);
+
+    try {
+      const result = await stopVoiceRecording();
+      if (!result || !result.uri) return;
+
+      const publicUrl = await uploadVoiceNote(user.id, result.uri);
+      const sentMsg = await sendVoiceNoteMessage(
+        user.id,
+        id,
+        publicUrl,
+        result.durationSeconds,
+      );
+      setMessages((prev) => [...prev, sentMsg]);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } catch (err) {
+      console.warn("Failed to send voice note:", err);
+    } finally {
+      setIsSending(false);
+      setRecordDuration(0);
+    }
+  };
 
   const handleDatePromptTap = (prompt: string) => {
     setInputText(prompt);
@@ -356,6 +421,29 @@ export default function ChatScreen() {
           }
           renderItem={({ item }) => {
             const isMe = item.sender_id === myUserId;
+            const isVoiceNote =
+              item.content?.startsWith("[Voice Note") ||
+              Boolean(
+                item.image_url &&
+                  (item.image_url.includes(".m4a") ||
+                    item.image_url.includes("/chat_audio/") ||
+                    item.image_url.startsWith("data:audio")),
+              );
+
+            if (isVoiceNote && item.image_url) {
+              const match = item.content?.match(/\[Voice Note\|(\d+)s\]/);
+              const duration = match ? parseInt(match[1], 10) : 12;
+              return (
+                <VoiceNoteBubble
+                  audioUrl={item.image_url}
+                  durationSeconds={duration}
+                  sent={isMe}
+                  timestamp={item.created_at}
+                  read={Boolean(item.read_at)}
+                />
+              );
+            }
+
             return (
               <ChatBubble
                 message={item.content}
@@ -412,56 +500,117 @@ export default function ChatScreen() {
         </ScrollView>
       </View>
 
-      {/* Input Composer */}
-      <View
-        style={[
-          styles.composerBar,
-          {
-            paddingBottom: Math.max(insets.bottom, 10),
-            backgroundColor: colors.surface,
-            borderTopColor: colors.border,
-          },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Attach photo"
-          onPress={() => { void handlePickPhoto(); }}
-          style={[styles.attachButton, { backgroundColor: colors.subtle }]}
-        >
-          <Icon name="photo" color={colors.text} size={18} />
-        </Pressable>
-
-        <TextInput
-          value={inputText}
-          onChangeText={handleInputChange}
-          placeholder={`Message ${memberName.split(" ")[0]}…`}
-          placeholderTextColor={colors.secondary}
-          multiline
-          maxLength={500}
-          style={[styles.composerInput, { backgroundColor: colors.subtle, borderColor: colors.border, color: colors.text }]}
-        />
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Send message"
-          onPress={() => { void handleSend(); }}
-          disabled={(!inputText.trim() && !selectedPhotoUri) || isSending}
-          style={({ pressed }) => [
-            styles.sendButton,
+      {/* Input Composer & Voice Note Controls */}
+      {isRecordingAudio ? (
+        <View
+          style={[
+            styles.recordingComposer,
             {
-              backgroundColor: colors.accent,
-              opacity: (!inputText.trim() && !selectedPhotoUri) || isSending ? 0.4 : pressed ? 0.8 : 1,
+              paddingBottom: Math.max(insets.bottom, 10),
+              backgroundColor: colors.surface,
+              borderTopColor: colors.border,
             },
           ]}
         >
-          {isSending ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
+          <View style={styles.recDot} />
+          <Text style={[styles.recTimer, { color: colors.text }]}>
+            {formatAudioDuration(recordDuration)}
+          </Text>
+          <Text style={[styles.recHint, { color: colors.secondary }]}>Recording…</Text>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Discard recording"
+            onPress={() => { void handleCancelRecord(); }}
+            style={[styles.recActionBtn, { backgroundColor: colors.subtle }]}
+            hitSlop={8}
+          >
+            <Icon name="trash" color="#EF4444" size={18} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Send voice note"
+            onPress={() => { void handleSendRecord(); }}
+            style={[styles.recActionBtn, { backgroundColor: colors.accent }]}
+            hitSlop={8}
+          >
             <Icon name="send" color="#FFFFFF" size={17} />
-          )}
-        </Pressable>
-      </View>
+          </Pressable>
+        </View>
+      ) : (
+        <View
+          style={[
+            styles.composerBar,
+            {
+              paddingBottom: Math.max(insets.bottom, 10),
+              backgroundColor: colors.surface,
+              borderTopColor: colors.border,
+            },
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Attach photo"
+            onPress={() => { void handlePickPhoto(); }}
+            style={[styles.attachButton, { backgroundColor: colors.subtle }]}
+          >
+            <Icon name="photo" color={colors.text} size={18} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Record voice note"
+            onPress={() => { void handleStartRecord(); }}
+            style={[styles.attachButton, { backgroundColor: colors.subtle }]}
+          >
+            <Icon name="mic" color={colors.text} size={18} />
+          </Pressable>
+
+          <TextInput
+            value={inputText}
+            onChangeText={handleInputChange}
+            placeholder={`Message ${memberName.split(" ")[0]}…`}
+            placeholderTextColor={colors.secondary}
+            multiline
+            maxLength={500}
+            style={[
+              styles.composerInput,
+              { backgroundColor: colors.subtle, borderColor: colors.border, color: colors.text },
+            ]}
+          />
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              !inputText.trim() && !selectedPhotoUri ? "Record Voice Note" : "Send message"
+            }
+            onPress={() => {
+              if (!inputText.trim() && !selectedPhotoUri) {
+                void handleStartRecord();
+              } else {
+                void handleSend();
+              }
+            }}
+            disabled={isSending}
+            style={({ pressed }) => [
+              styles.sendButton,
+              {
+                backgroundColor: colors.accent,
+                opacity: isSending ? 0.4 : pressed ? 0.8 : 1,
+              },
+            ]}
+          >
+            {isSending ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : !inputText.trim() && !selectedPhotoUri ? (
+              <Icon name="mic" color="#FFFFFF" size={18} />
+            ) : (
+              <Icon name="send" color="#FFFFFF" size={17} />
+            )}
+          </Pressable>
+        </View>
+      )}
 
       {member && user ? (
         <SafetyActionModal
@@ -567,6 +716,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   sendButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recordingComposer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  recDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#EF4444",
+  },
+  recTimer: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  recHint: {
+    flex: 1,
+    fontSize: 13,
+    fontStyle: "italic",
+  },
+  recActionBtn: {
     width: 42,
     height: 42,
     borderRadius: 21,

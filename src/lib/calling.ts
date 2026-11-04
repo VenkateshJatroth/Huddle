@@ -341,3 +341,114 @@ export function subscribeToIncomingCalls(
     void supabase.removeChannel(pgChannel);
   };
 }
+
+export type CallHistoryItem = {
+  id: string;
+  otherUserId: string;
+  otherUserName: string;
+  otherUserAvatar?: string | null;
+  callType: CallType;
+  direction: "incoming" | "outgoing" | "missed";
+  status: CallStatus;
+  durationSeconds: number;
+  createdAt: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+};
+
+/**
+ * Marks an unanswered or timed-out call session as 'missed'.
+ */
+export async function logMissedCall(callId: string): Promise<void> {
+  await updateCallStatus(callId, "missed");
+}
+
+/**
+ * Fetches call history for the authenticated user with partner details and duration.
+ */
+export async function fetchCallHistory(userId: string): Promise<CallHistoryItem[]> {
+  try {
+    const { data, error } = await (supabase as any)
+      .from("call_sessions")
+      .select("*")
+      .or(`caller_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order("created_at", { ascending: false })
+      .limit(60);
+
+    if (error || !data || !Array.isArray(data)) {
+      return [];
+    }
+
+    // Collect unique partner IDs
+    const otherUserIds = Array.from(
+      new Set(
+        data.map((row: any) =>
+          row.caller_id === userId ? row.receiver_id : row.caller_id,
+        ).filter(Boolean),
+      ),
+    );
+
+    // Fetch profile details for all call partners in parallel
+    const profileMap = new Map<string, { name: string; avatar?: string | null }>();
+    if (otherUserIds.length > 0) {
+      try {
+        const { data: profiles } = await (supabase as any)
+          .from("profiles")
+          .select("id, display_name, full_name, username, avatar_url")
+          .in("id", otherUserIds);
+
+        if (profiles && Array.isArray(profiles)) {
+          profiles.forEach((p: any) => {
+            profileMap.set(p.id, {
+              name: p.display_name || p.full_name || p.username || "Huddle Member",
+              avatar: p.avatar_url,
+            });
+          });
+        }
+      } catch {
+        // Fallback to defaults
+      }
+    }
+
+    return data.map((row: any) => {
+      const isCaller = row.caller_id === userId;
+      const otherUserId = isCaller ? row.receiver_id : row.caller_id;
+      const partner = profileMap.get(otherUserId);
+
+      // Duration calculation in seconds
+      let durationSeconds = 0;
+      if (row.started_at && row.ended_at) {
+        const start = new Date(row.started_at).getTime();
+        const end = new Date(row.ended_at).getTime();
+        durationSeconds = Math.max(0, Math.round((end - start) / 1000));
+      }
+
+      // Determine call direction & missed status
+      let direction: "incoming" | "outgoing" | "missed";
+      if (row.status === "missed" || (!isCaller && (row.status === "declined" || (!row.started_at && row.status === "ended")))) {
+        direction = "missed";
+      } else if (isCaller) {
+        direction = "outgoing";
+      } else {
+        direction = "incoming";
+      }
+
+      return {
+        id: row.id,
+        otherUserId,
+        otherUserName: partner?.name || (isCaller ? "Contact" : row.caller_name || "Huddle Member"),
+        otherUserAvatar: partner?.avatar || (isCaller ? null : row.caller_avatar),
+        callType: (row.call_type as CallType) || "voice",
+        direction,
+        status: row.status as CallStatus,
+        durationSeconds,
+        createdAt: row.created_at,
+        startedAt: row.started_at,
+        endedAt: row.ended_at,
+      };
+    });
+  } catch (err) {
+    console.warn("fetchCallHistory error:", err);
+    return [];
+  }
+}

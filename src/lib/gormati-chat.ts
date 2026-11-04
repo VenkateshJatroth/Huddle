@@ -179,6 +179,62 @@ export async function sendChatMessage(
 }
 
 /**
+ * Sends an audio voice note message in the 1-on-1 conversation.
+ */
+export async function sendVoiceNoteMessage(
+  senderId: string,
+  receiverId: string,
+  audioUrl: string,
+  durationSeconds: number,
+): Promise<ChatMessage> {
+  const content = `[Voice Note|${durationSeconds}s]`;
+  const nowIso = new Date().toISOString();
+  const fallbackMsg: ChatMessage = {
+    id: `voice-${Date.now()}`,
+    sender_id: senderId,
+    receiver_id: receiverId,
+    content,
+    image_url: audioUrl,
+    read_at: null,
+    created_at: formatMessageTime(nowIso),
+  };
+
+  try {
+    const { data, error } = await (supabase as any)
+      .from("direct_messages")
+      .insert({
+        sender_id: senderId,
+        receiver_id: receiverId,
+        content,
+        image_url: audioUrl,
+      })
+      .select("*")
+      .maybeSingle();
+
+    if (!error && data) {
+      return {
+        id: data.id,
+        sender_id: data.sender_id,
+        receiver_id: data.receiver_id,
+        content: data.content,
+        image_url: data.image_url,
+        read_at: data.read_at,
+        created_at: formatMessageTime(data.created_at),
+      };
+    }
+  } catch {
+    // Fallback to local
+  }
+
+  if (!demoMessageThreads[receiverId]) {
+    demoMessageThreads[receiverId] = [];
+  }
+  demoMessageThreads[receiverId].push(fallbackMsg);
+
+  return fallbackMsg;
+}
+
+/**
  * Marks messages received by current user from partner as read.
  */
 export async function markMessagesAsRead(userId: string, partnerId: string): Promise<void> {

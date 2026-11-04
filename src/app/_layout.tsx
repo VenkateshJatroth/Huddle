@@ -1,12 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { View } from "react-native";
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
-import { Icon } from "../components/Icon";
 import { UpdateNotificationBanner } from "../components/UpdateNotificationBanner";
-import { subscribeToIncomingCalls, updateCallStatus, type CallSession } from "../lib/calling";
+import { IncomingCallModal } from "../components/calling/IncomingCallModal";
+import {
+  logMissedCall,
+  subscribeToIncomingCalls,
+  updateCallStatus,
+  type CallSession,
+} from "../lib/calling";
+import { startRingtone, stopRingtone } from "../lib/ringtone";
 import { fetchFullProfile } from "../lib/gormati-profiles";
 import {
   checkAndTriggerProfileCompletionReminder,
@@ -34,10 +39,10 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
-  const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { user } = useAuth();
   const [incomingCall, setIncomingCall] = useState<CallSession | null>(null);
+  const ringTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Set up listener for notification clicks to auto-route to chats or member profiles
   useNotificationObserver();
@@ -47,26 +52,40 @@ function RootNavigator() {
     return setupUpdateLifecycle();
   }, []);
 
-  // Listen for real-time incoming voice/video calls
+  // Listen for real-time incoming voice/video calls with VoIP ringtone & missed call timeout
   useEffect(() => {
     if (!user?.id) return;
     const unsubscribe = subscribeToIncomingCalls(
       user.id,
       (call) => {
         setIncomingCall(call);
+        void startRingtone();
         void presentIncomingCallNotification({
           callId: call.id,
           callerId: call.caller_id,
           callerName: call.caller_name || "Huddle Member",
           callType: call.call_type,
         });
+
+        // 35-second auto-timeout: if unanswered, log as missed call
+        if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+        ringTimeoutRef.current = setTimeout(() => {
+          stopRingtone();
+          void dismissIncomingCallNotification();
+          void logMissedCall(call.id);
+          setIncomingCall((curr) => (curr?.id === call.id ? null : curr));
+        }, 35000);
       },
       (dismissedCallId) => {
+        if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+        stopRingtone();
         setIncomingCall((curr) => (curr?.id === dismissedCallId ? null : curr));
         void dismissIncomingCallNotification();
       },
     );
     return () => {
+      if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+      stopRingtone();
       unsubscribe();
     };
   }, [user?.id]);
@@ -92,6 +111,8 @@ function RootNavigator() {
 
   const handleAcceptCall = () => {
     if (!incomingCall) return;
+    if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+    stopRingtone();
     const callToAnswer = incomingCall;
     setIncomingCall(null);
     void dismissIncomingCallNotification();
@@ -110,6 +131,8 @@ function RootNavigator() {
 
   const handleDeclineCall = () => {
     if (!incomingCall) return;
+    if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+    stopRingtone();
     void dismissIncomingCallNotification();
     void updateCallStatus(incomingCall.id, "declined");
     setIncomingCall(null);
@@ -120,54 +143,13 @@ function RootNavigator() {
       <StatusBar style={colors.background === "#000000" ? "light" : "dark"} />
       <UpdateNotificationBanner />
 
-      {/* Floating Incoming Call Banner */}
+      {/* Full-Screen VoIP Incoming Call Screen with Ringtone & Pulsing Ring */}
       {incomingCall ? (
-        <View
-          style={[
-            styles.incomingCallToast,
-            {
-              top: Math.max(insets.top + 8, 20),
-              backgroundColor: colors.surface,
-              borderColor: colors.accent,
-            },
-          ]}
-        >
-          <View style={[styles.callIconCircle, { backgroundColor: colors.accentSoft }]}>
-            <Icon
-              name={incomingCall.call_type === "video" ? "video" : "phone"}
-              color={colors.accent}
-              size={22}
-            />
-          </View>
-          <View style={styles.callDetails}>
-            <Text numberOfLines={1} style={[styles.callerName, { color: colors.text }]}>
-              {incomingCall.caller_name || "Huddle Member"}
-            </Text>
-            <Text style={[styles.callTypeLabel, { color: colors.secondary }]}>
-              Incoming {incomingCall.call_type === "video" ? "Video" : "Voice"} Call…
-            </Text>
-          </View>
-          <View style={styles.callActions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Decline call"
-              onPress={handleDeclineCall}
-              style={[styles.callActionBtn, { backgroundColor: "#EF4444" }]}
-              hitSlop={8}
-            >
-              <Icon name="close" color="#FFFFFF" size={18} />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Answer call"
-              onPress={handleAcceptCall}
-              style={[styles.callActionBtn, { backgroundColor: "#10B981" }]}
-              hitSlop={8}
-            >
-              <Icon name="phone" color="#FFFFFF" size={18} />
-            </Pressable>
-          </View>
-        </View>
+        <IncomingCallModal
+          call={incomingCall}
+          onAccept={handleAcceptCall}
+          onDecline={handleDeclineCall}
+        />
       ) : null}
 
       <Stack screenOptions={{ headerShown: false }}>
@@ -180,6 +162,7 @@ function RootNavigator() {
         <Stack.Screen name="onboarding" options={{ presentation: "modal" }} />
         <Stack.Screen name="member/[id]" options={{ presentation: "card" }} />
         <Stack.Screen name="chat/[id]" options={{ presentation: "card" }} />
+        <Stack.Screen name="calls" options={{ presentation: "card" }} />
         <Stack.Screen name="call/[id]" options={{ presentation: "fullScreenModal", gestureEnabled: false }} />
         <Stack.Screen name="vibe-check" options={{ presentation: "card" }} />
         <Stack.Screen name="settings" options={{ presentation: "card" }} />
@@ -191,54 +174,3 @@ function RootNavigator() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  incomingCallToast: {
-    position: "absolute",
-    left: 14,
-    right: 14,
-    zIndex: 9999,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 12,
-    gap: 12,
-  },
-  callIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  callDetails: {
-    flex: 1,
-    gap: 2,
-  },
-  callerName: {
-    fontSize: 15,
-    fontWeight: "800",
-    letterSpacing: -0.2,
-  },
-  callTypeLabel: {
-    fontSize: 12,
-  },
-  callActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  callActionBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});

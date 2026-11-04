@@ -92,10 +92,17 @@ export default function ChatTabScreen() {
       const threadItems: ConversationThread[] = await Promise.all(
         Array.from(threadMap.entries()).map(async ([partnerId, info]) => {
           const profile = await fetchMemberProfile(partnerId);
+          let snippet = info.lastMsg.content;
+          if (snippet?.startsWith("[Voice Note") || info.lastMsg.image_url?.includes(".m4a")) {
+            snippet = "🎙️ Voice Note";
+          } else if (!snippet) {
+            snippet = info.lastMsg.image_url ? "📷 Photo" : "Message";
+          }
+
           return {
             partnerId,
             partnerProfile: profile,
-            lastMessage: info.lastMsg.content || (info.lastMsg.image_url ? "📷 Photo" : "Message"),
+            lastMessage: snippet,
             lastMessageTime: formatSnippetTime(info.lastMsg.created_at),
             isUnread: info.isUnread,
           };
@@ -184,6 +191,15 @@ export default function ChatTabScreen() {
         </View>
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Call History and Logs"
+            onPress={() => router.push("/calls" as never)}
+            style={styles.headerAction}
+          >
+            <Icon name="phone" color={colors.text} size={20} />
+          </Pressable>
+
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Start 3-Minute Vibe Check Speed Match"
