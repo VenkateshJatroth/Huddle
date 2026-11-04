@@ -1,7 +1,6 @@
 import React from "react";
 import { Platform, View, type ViewProps } from "react-native";
-import { Audio } from "expo-av";
-import { setAudioModeAsync as setExpoAudioModeAsync } from "expo-audio";
+import { setAudioModeAsync } from "expo-audio";
 import type {
   MediaStream as WebRTCMediaStream,
   MediaStreamTrack as WebRTCMediaStreamTrack,
@@ -101,19 +100,7 @@ export function restartPeerIce(pc: any): boolean {
  */
 export async function configureAudioSessionForCall(speakerOn: boolean = true): Promise<void> {
   try {
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-      playThroughEarpieceAndroid: !speakerOn,
-      shouldDuckAndroid: true,
-    });
-  } catch (err) {
-    console.warn("expo-av setAudioModeAsync warning:", err);
-  }
-
-  try {
-    await setExpoAudioModeAsync({
+    await setAudioModeAsync({
       allowsRecording: true,
       playsInSilentMode: true,
       shouldPlayInBackground: true,
@@ -130,19 +117,7 @@ export async function configureAudioSessionForCall(speakerOn: boolean = true): P
  */
 export async function resetAudioSession(): Promise<void> {
   try {
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: false,
-      staysActiveInBackground: false,
-      shouldDuckAndroid: false,
-      playThroughEarpieceAndroid: false,
-    });
-  } catch {
-    // Guard
-  }
-
-  try {
-    await setExpoAudioModeAsync({
+    await setAudioModeAsync({
       allowsRecording: false,
       playsInSilentMode: true,
       shouldPlayInBackground: false,

@@ -87,7 +87,7 @@
         "expo-build-properties",
         {
           "android": {
-            "extraProguardRules": "-keep class org.webrtc.** { *; }\n-dontwarn org.webrtc.**\n-keep class com.oney.WebRTCModule.** { *; }\n-dontwarn com.oney.WebRTCModule.**"
+            "extraProguardRules": "-keep class org.webrtc.** { *; }\n-dontwarn org.webrtc.**\n-keep class com.oney.WebRTCModule.** { *; }\n-dontwarn com.oney.WebRTCModule.**\n-dontwarn expo.modules.**"
           }
         }
       ],
